@@ -1,5 +1,5 @@
-import { handler, param, readJsonBody } from "../../../lib/server/http.ts";
-import { getWorkspace } from "../../../lib/server/studio.ts";
+import { handler, param, readJsonBody } from "../../../../lib/server/http.ts";
+import { getWorkspace } from "../../../../lib/server/studio.ts";
 
 export const PATCH = handler(async (context) =>
   (await getWorkspace()).updateProduction(

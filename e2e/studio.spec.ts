@@ -10,9 +10,10 @@ test.describe.configure({ mode: "serial" });
 
 test("creates a project, campaign and production using only the UI", async ({ page }) => {
   await goto(page, "/");
-  await expect(page.getByRole("heading", { name: "No projects yet" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Dashboard" })).toBeVisible();
 
   await page.getByRole("link", { name: "New project" }).click();
+  await page.waitForURL(/projects\/new$/);
   await hydrated(page);
   await page.getByLabel("Name", { exact: true }).fill("CookGuide");
   await expect(page.getByLabel("Folder name", { exact: true })).toHaveAttribute(
@@ -25,6 +26,7 @@ test("creates a project, campaign and production using only the UI", async ({ pa
   await expect(page.getByRole("heading", { level: 1, name: "CookGuide" })).toBeVisible();
 
   await page.getByRole("link", { name: "New campaign" }).click();
+  await page.waitForURL(/campaigns\/new$/);
   await hydrated(page);
   await page.getByLabel("Name", { exact: true }).fill("QR Awareness");
   await page.getByLabel("Objective", { exact: true }).fill("Drive scans of the CookGuide QR code");
@@ -34,6 +36,7 @@ test("creates a project, campaign and production using only the UI", async ({ pa
   await expect(page.getByRole("listitem").filter({ hasText: "Busy parents" })).toBeVisible();
 
   await page.getByRole("link", { name: "New production" }).click();
+  await page.waitForURL(/productions\/new$/);
   await hydrated(page);
   await page.getByLabel("Title", { exact: true }).fill("CookGuide QR Code Advert");
   await page.getByRole("button", { name: "Portrait 9:16" }).click();
@@ -170,7 +173,7 @@ test("archives a production after typed confirmation", async ({ page }) => {
   await goto(page, "/projects/cookguide/campaigns/qr-awareness/productions/new");
   await page.getByLabel("Title", { exact: true }).fill("Throwaway");
   await page.getByRole("button", { name: "Create production" }).click();
-  await expect(page).toHaveURL(/\/productions\/throwaway$/);
+  await page.waitForURL(/\/productions\/throwaway$/);
   await hydrated(page);
 
   await page.getByText("Archive this production").click();

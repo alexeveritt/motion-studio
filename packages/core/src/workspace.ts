@@ -92,6 +92,8 @@ export class WorkspaceService {
   readonly workspaceRoot: string;
   /** Removed records are moved here, never deleted. Sibling of the projects folder. */
   readonly archiveRoot: string;
+  /** Gitignored scratch space: upload staging and prompt candidates. */
+  readonly tmpRoot: string;
   readonly settings: Settings;
   readonly policy: PathPolicy;
   readonly #now: () => Date;
@@ -107,8 +109,9 @@ export class WorkspaceService {
         "The archive folder would be outside the repository",
       );
     }
+    this.tmpRoot = path.join(repoRoot, ".motion-studio", "tmp");
     this.settings = settings;
-    this.policy = new PathPolicy([workspaceRoot, this.archiveRoot]);
+    this.policy = new PathPolicy([workspaceRoot, this.archiveRoot, this.tmpRoot]);
     this.#now = now ?? (() => new Date());
   }
 
@@ -386,7 +389,7 @@ export class WorkspaceService {
    * (campaigns, productions) are excluded.
    */
   async listFiles(scopeName: Scope, id: string): Promise<string[]> {
-    const { dir } = await this.#locate(scopeName, id);
+    const { dir } = await this.locate(scopeName, id);
     const nested = new Set(
       scopeName === "project" ? ["campaigns"] : scopeName === "campaign" ? ["productions"] : [],
     );
@@ -423,7 +426,7 @@ export class WorkspaceService {
     rawInput: unknown,
   ): Promise<{ archivedPath: string }> {
     const input = parseInput(archiveInputSchema, rawInput, "archive request");
-    const { dir, record } = await this.#locate(scopeName, id);
+    const { dir, record } = await this.locate(scopeName, id);
     if (input.confirmSlug !== record.slug) {
       throw new MotionStudioError("CONFIRMATION_REQUIRED", `Type "${record.slug}" to confirm`);
     }
@@ -455,7 +458,7 @@ export class WorkspaceService {
     expectedRevision: number,
     apply: (current: z.infer<(typeof RECORD_SCHEMAS)[S]>) => object,
   ): Promise<z.infer<(typeof RECORD_SCHEMAS)[S]>> {
-    const { dir } = await this.#locate(scopeName, id);
+    const { dir } = await this.locate(scopeName, id);
     const file = this.policy.resolve(dir, RECORD_FILES[scopeName]);
     const schema = RECORD_SCHEMAS[scopeName];
     return this.#mutex.run(file, async () => {
@@ -480,7 +483,7 @@ export class WorkspaceService {
     });
   }
 
-  async #locate(
+  async locate(
     scopeName: Scope,
     id: string,
   ): Promise<{ dir: string; record: ProjectRecord | CampaignRecord | ProductionRecord }> {
@@ -514,7 +517,7 @@ export class WorkspaceService {
     const relative = documentPath(scopeName, kind);
     if (!relative)
       throw new MotionStudioError("NOT_FOUND", `Unknown ${scopeName} document "${kind}"`);
-    const { dir } = await this.#locate(scopeName, id);
+    const { dir } = await this.locate(scopeName, id);
     return this.policy.resolveRelative(dir, relative);
   }
 
@@ -603,6 +606,16 @@ export class WorkspaceService {
     if (issues.length > 0) throw new SchemaValidationError("format", issues, "INVALID_INPUT");
   }
 
+  /** Current time as an ISO 8601 string, from the injectable clock. */
+  timestamp(): string {
+    return this.#timestamp();
+  }
+
+  /** Current time, from the injectable clock. */
+  now(): Date {
+    return this.#now();
+  }
+
   #timestamp(): string {
     return this.#now().toISOString();
   }
@@ -663,7 +676,7 @@ function joinSlugs(first: string, second: string): string {
   return `${first}-${second}`.slice(0, SLUG_MAX_LENGTH).replace(/-+$/, "");
 }
 
-function formatStamp(date: Date): string {
+export function formatStamp(date: Date): string {
   const iso = date.toISOString();
   return `${iso.slice(0, 10).replaceAll("-", "")}-${iso.slice(11, 19).replaceAll(":", "")}`;
 }

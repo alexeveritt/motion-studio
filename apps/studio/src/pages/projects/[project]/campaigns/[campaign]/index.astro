@@ -1,6 +1,7 @@
 ---
 import { formatDurationLabel } from "@motion-studio/core";
 import ArchiveButton from "../../../../../components/ArchiveButton.tsx";
+import AssetLibrary from "../../../../../components/AssetLibrary.tsx";
 import ArchivedNotice from "../../../../../components/ArchivedNotice.astro";
 import Breadcrumbs from "../../../../../components/Breadcrumbs.astro";
 import CampaignForm from "../../../../../components/CampaignForm.tsx";
@@ -19,13 +20,14 @@ import {
   projectUrl,
 } from "../../../../../lib/server/pages.ts";
 
-const { workspace, catalog, archiveFolder } = await loadPageContext();
+const { workspace, assets, catalog, archiveFolder, maxUploadBytes } = await loadPageContext();
 const project = findProject(catalog, Astro.params.project);
 const campaign = findCampaign(project, Astro.params.campaign);
 
 const TABS = [
   { id: "overview", label: "Overview" },
   { id: "brief", label: "Brief" },
+  { id: "assets", label: "Assets" },
   { id: "files", label: "Files" },
 ];
 const requested = Astro.url.searchParams.get("tab");
@@ -36,6 +38,8 @@ const brief =
     : undefined;
 const files =
   campaign && tab === "files" ? await workspace.listFiles("campaign", campaign.record.id) : [];
+const campaignAssets =
+  campaign && tab === "assets" ? await assets.list("campaign", campaign.record.id) : undefined;
 const listItems = (items: string[]) => (items.length > 0 ? items : ["—"]);
 ---
 
@@ -158,6 +162,17 @@ const listItems = (items: string[]) => (items.length > 0 ? items : ["—"]);
           kind="brief"
           label="Campaign brief"
           initial={brief}
+        />
+      )}
+      {tab === "assets" && campaignAssets && (
+        <AssetLibrary
+          client:load
+          scope="campaign"
+          id={campaign.record.id}
+          title="Campaign assets"
+          description="Shared by every production in this campaign."
+          initial={campaignAssets}
+          maxUploadBytes={maxUploadBytes}
         />
       )}
       {tab === "files" && (

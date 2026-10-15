@@ -21,7 +21,9 @@ export type ErrorCode =
   | "INVALID_INPUT"
   | "LIMIT_EXCEEDED"
   | "ALREADY_EXISTS"
-  | "CONFIRMATION_REQUIRED";
+  | "CONFIRMATION_REQUIRED"
+  | "IN_USE"
+  | "UNSUPPORTED_MEDIA";
 
 export class MotionStudioError extends Error {
   readonly code: ErrorCode;

@@ -96,6 +96,27 @@ export const archiveInputSchema = z.strictObject({
   confirmSlug: z.string(),
 });
 
+/** Asset folders: project `assets/`, project `brand/assets/`, campaign `assets/`, production `assets/`. */
+export const assetScope = z.enum(["project", "brand", "campaign", "production"]);
+export type AssetScope = z.infer<typeof assetScope>;
+
+const optionalMetadata = (max: number) => z.string().trim().max(max).optional();
+
+export const assetMetadataInputSchema = z.strictObject({
+  /** SHA-256 of the sidecar file the editor loaded. */
+  baseHash: z.string().regex(/^[a-f0-9]{64}$/),
+  altText: optionalMetadata(1000),
+  source: optionalMetadata(1000),
+  licenceNotes: optionalMetadata(2000),
+});
+
+export const assetRegisterInputSchema = z.strictObject({ fileName: z.string().min(1).max(255) });
+
+export const assetArchiveInputSchema = z.strictObject({
+  /** The operator must type the stored file name to confirm. */
+  confirmName: z.string(),
+});
+
 export const scope = z.enum(["project", "campaign", "production"]);
 export type Scope = z.infer<typeof scope>;
 
@@ -120,3 +141,4 @@ export type CampaignUpdateInput = z.infer<typeof campaignUpdateInputSchema>;
 export type ProductionCreateInput = z.input<typeof productionCreateInputSchema>;
 export type ProductionUpdateInput = z.infer<typeof productionUpdateInputSchema>;
 export type DocumentSaveInput = z.infer<typeof documentSaveInputSchema>;
+export type AssetMetadataInput = z.infer<typeof assetMetadataInputSchema>;

@@ -26,24 +26,26 @@ export const onRequest = defineMiddleware(async ({ request, url }, next) => {
 
   const response = await next();
   const headers = response.headers;
-  headers.set(
-    "Content-Security-Policy",
-    [
-      "default-src 'self'",
-      // Inline scripts and styles are required by Astro island hydration and
-      // the Vite dev client. No remote origins are permitted.
-      "script-src 'self' 'unsafe-inline'",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob:",
-      "media-src 'self' blob:",
-      "font-src 'self' data:",
-      "connect-src 'self' ws://127.0.0.1:* ws://localhost:*",
-      "object-src 'none'",
-      "base-uri 'none'",
-      "form-action 'self'",
-      "frame-ancestors 'none'",
-    ].join("; "),
-  );
+  // Endpoints may set a stricter policy of their own (served SVGs do).
+  if (!headers.has("Content-Security-Policy"))
+    headers.set(
+      "Content-Security-Policy",
+      [
+        "default-src 'self'",
+        // Inline scripts and styles are required by Astro island hydration and
+        // the Vite dev client. No remote origins are permitted.
+        "script-src 'self' 'unsafe-inline'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: blob:",
+        "media-src 'self' blob:",
+        "font-src 'self' data:",
+        "connect-src 'self' ws://127.0.0.1:* ws://localhost:*",
+        "object-src 'none'",
+        "base-uri 'none'",
+        "form-action 'self'",
+        "frame-ancestors 'none'",
+      ].join("; "),
+    );
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("Referrer-Policy", "no-referrer");
   headers.set("X-Frame-Options", "DENY");

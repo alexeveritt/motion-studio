@@ -5,7 +5,7 @@ import {
   type ProductionEntry,
   type ProjectEntry,
 } from "@motion-studio/core";
-import { getWorkspace } from "./studio.ts";
+import { getAssets, getWorkspace } from "./studio.ts";
 
 /** Everything a page needs: the service, a fresh catalog and display helpers. */
 export async function loadPageContext() {
@@ -13,7 +13,9 @@ export async function loadPageContext() {
   const catalog = await workspace.scan();
   return {
     workspace,
+    assets: await getAssets(),
     catalog,
+    maxUploadBytes: workspace.settings.limits.maxUploadBytes,
     profiles: workspace.settings.renderProfiles.map((profile) => ({
       value: profile.id,
       label: profile.name,

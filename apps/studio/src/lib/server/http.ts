@@ -10,10 +10,12 @@ const STATUS: Partial<Record<ErrorCode, number>> = {
   NOT_FOUND: 404,
   REVISION_CONFLICT: 409,
   ALREADY_EXISTS: 409,
+  IN_USE: 409,
   LIMIT_EXCEEDED: 413,
+  UNSUPPORTED_MEDIA: 415,
 };
 
-class HttpError extends MotionStudioError {
+export class HttpError extends MotionStudioError {
   readonly status: number;
 
   constructor(status: number, code: ErrorCode, message: string) {

@@ -1,11 +1,13 @@
 ---
 import { formatDurationLabel, formatTimecode, sectionCompleteness } from "@motion-studio/core";
 import ArchiveButton from "../../../../../../components/ArchiveButton.tsx";
+import AssetLibrary from "../../../../../../components/AssetLibrary.tsx";
 import Breadcrumbs from "../../../../../../components/Breadcrumbs.astro";
 import CopyPath from "../../../../../../components/CopyPath.tsx";
 import MarkdownEditor from "../../../../../../components/MarkdownEditor.tsx";
 import NotFound from "../../../../../../components/NotFound.astro";
 import ProductionForm from "../../../../../../components/ProductionForm.tsx";
+import PromptTools from "../../../../../../components/PromptTools.tsx";
 import Tabs from "../../../../../../components/Tabs.astro";
 import Base from "../../../../../../layouts/Base.astro";
 import { productionTone } from "../../../../../../lib/format.ts";
@@ -19,7 +21,8 @@ import {
   projectUrl,
 } from "../../../../../../lib/server/pages.ts";
 
-const { workspace, catalog, profiles, archiveFolder } = await loadPageContext();
+const { workspace, assets, catalog, profiles, archiveFolder, maxUploadBytes } =
+  await loadPageContext();
 const project = findProject(catalog, Astro.params.project);
 const campaign = findCampaign(project, Astro.params.campaign);
 const production = findProduction(campaign, Astro.params.production);
@@ -29,6 +32,7 @@ const TABS = [
   { id: "brief", label: "Brief" },
   { id: "prompt", label: "Prompt" },
   { id: "notes", label: "Notes" },
+  { id: "assets", label: "Assets" },
   { id: "files", label: "Files" },
 ];
 const requested = Astro.url.searchParams.get("tab");
@@ -41,6 +45,7 @@ const documentTab =
     ? await workspace.readDocument("production", id, tab)
     : undefined;
 const files = id && tab === "files" ? await workspace.listFiles("production", id) : [];
+const productionAssets = id && tab === "assets" ? await assets.list("production", id) : undefined;
 const sections = brief ? sectionCompleteness(brief.content) : [];
 const filled = sections.filter((s) => s.filled).length;
 const profile = workspace.settings.renderProfiles.find(
@@ -119,7 +124,7 @@ const issues = catalog.issues.filter(
               </p>
               <p class="muted">
                 Entry file <code>{production.record.files.entry}</code>. Preview and rendering
-                arrive in later milestones.
+                arrive in later milestones. Use the Prompt tab to hand the work to Claude Code.
               </p>
             </div>
             <div>
@@ -186,14 +191,17 @@ const issues = catalog.issues.filter(
         />
       )}
       {tab === "prompt" && documentTab && (
-        <MarkdownEditor
-          client:load
-          scope="production"
-          id={production.record.id}
-          kind="prompt"
-          label="Claude prompt"
-          initial={documentTab}
-        />
+        <>
+          <PromptTools client:load productionId={production.record.id} />
+          <MarkdownEditor
+            client:load
+            scope="production"
+            id={production.record.id}
+            kind="prompt"
+            label="Claude prompt"
+            initial={documentTab}
+          />
+        </>
       )}
       {tab === "notes" && documentTab && (
         <MarkdownEditor
@@ -203,6 +211,17 @@ const issues = catalog.issues.filter(
           kind="notes"
           label="Notes"
           initial={documentTab}
+        />
+      )}
+      {tab === "assets" && productionAssets && (
+        <AssetLibrary
+          client:load
+          scope="production"
+          id={production.record.id}
+          title="Production assets"
+          description="Assets used only by this production. Campaign, project and brand assets are also available to it."
+          initial={productionAssets}
+          maxUploadBytes={maxUploadBytes}
         />
       )}
       {tab === "files" && (

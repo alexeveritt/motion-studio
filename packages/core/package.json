@@ -7,7 +7,9 @@
     ".": "./src/index.ts",
     "./schemas": "./src/schemas/index.ts",
     "./slug": "./src/slug.ts",
-    "./time": "./src/time.ts"
+    "./time": "./src/time.ts",
+    "./diff": "./src/diff.ts",
+    "./media": "./src/media.ts"
   },
   "scripts": {
     "check": "tsc -p tsconfig.json"

@@ -4,7 +4,7 @@ A local-only workspace for organising, previewing and rendering code-driven moti
 
 The full build specification is in [`docs/SPEC.md`](docs/SPEC.md).
 
-> **Status: Milestone 1 (filesystem domain and CRUD).** Projects, campaigns and productions can be created, edited and archived from the studio, and their Markdown documents edited. Assets, preview and rendering arrive in later milestones.
+> **Status: Milestone 2 (asset library and context packet).** Projects, campaigns and productions can be created, edited and archived; assets uploaded, inventoried and archived; and a Claude context packet generated for any production. Preview and rendering arrive in Milestones 3 and 4.
 
 ## Requirements
 
@@ -24,15 +24,16 @@ pnpm exec playwright install chromium   # once, for browser tests only
 
 ## Commands
 
-| Command                   | Purpose                                                                |
-| ------------------------- | ---------------------------------------------------------------------- |
-| `pnpm dev`                | Start the studio on <http://127.0.0.1:4321> using `workspace/projects` |
-| `pnpm dev:fixtures`       | Start the studio against the sample data in `fixtures/`                |
-| `pnpm check`              | Type-check the core package and run `astro check`                      |
-| `pnpm test`               | Run unit tests (Vitest)                                                |
-| `pnpm lint`               | Run ESLint                                                             |
-| `pnpm format`             | Format files with Prettier (`pnpm format:check` to verify only)        |
-| `pnpm validate:workspace` | Validate every record and cross-reference; exits 1 on errors           |
+| Command                                     | Purpose                                                                |
+| ------------------------------------------- | ---------------------------------------------------------------------- |
+| `pnpm dev`                                  | Start the studio on <http://127.0.0.1:4321> using `workspace/projects` |
+| `pnpm dev:fixtures`                         | Start the studio against the sample data in `fixtures/`                |
+| `pnpm check`                                | Type-check the core package and run `astro check`                      |
+| `pnpm test`                                 | Run unit tests (Vitest)                                                |
+| `pnpm lint`                                 | Run ESLint                                                             |
+| `pnpm format`                               | Format files with Prettier (`pnpm format:check` to verify only)        |
+| `pnpm validate:workspace`                   | Validate every record, cross-reference, asset sidecar and asset hash   |
+| `pnpm -s context-packet -- <production-id>` | Print the Claude context packet for a production                       |
 
 `pnpm validate:workspace -- --workspace fixtures/workspace/projects` validates a different repository-relative workspace. The studio honours the same override through `MOTION_STUDIO_WORKSPACE`.
 
@@ -63,6 +64,24 @@ Each project is a folder under `workspace/projects/<slug>/` containing `project.
 - **Conflicts**: every save carries the revision (records) or content hash (documents) it started from. If the file changed in the meantime, for example because Claude Code edited it, the save is refused and nothing is overwritten. Copy your text, load the latest version and reapply.
 - **Archive** moves a folder, with everything beneath it, to `workspace/archive/<timestamp>_<scope>_<slug>-<id>/` after you type its slug. Nothing is deleted. To restore it, move the folder back and remove `archive.json`.
 - Editing files directly is fine. The studio rescans the disk on every page load, and `pnpm validate:workspace` reports anything malformed.
+
+## Assets
+
+Each project, brand, campaign and production has an `assets/` folder. Upload through the Assets tab (drag and drop or choose files), or copy files in by hand and press **Register**.
+
+- The file type is detected from the bytes. The browser's type and the file extension are ignored, so a PDF named `logo.png` is stored as `logo.pdf`. Allowed: PNG, JPEG, GIF, WebP, SVG, MP3, WAV, OGG, M4A, MP4, MOV, WebM, WOFF, WOFF2, TTF, OTF, PDF, TXT and Markdown.
+- Names are normalised (`Phone Screen (v2).png` becomes `phone-screen-v2.png`). The original name is kept in the sidecar. A clash gets a short suffix; an identical file is refused.
+- Every asset has a `<file>.asset.json` sidecar with its type, size, dimensions, SHA-256, alt text, source and licence notes. Commit both.
+- SVGs containing script, event handlers, external references or entities are refused. Served SVGs are sandboxed.
+- An asset referenced by any production's `src/` or `tests/` cannot be archived. Archiving moves the file and sidecar to the archive folder.
+- Uploads are staged in `.motion-studio/tmp/uploads/` and limited by `maxUploadBytes` and `maxProjectBytes` in settings.
+
+## Handing work to Claude Code
+
+The Prompt tab on a production holds the saved `prompt.md` and a **Claude handoff** panel:
+
+- **Copy context packet** copies a Markdown bundle of the prompt, edit boundary, composition contract, production record, render profile, project and campaign summaries, project context, brand guidance, brief, asset inventory with hashes, source file inventory and commands. It is generated from the files every time and never stored. The same packet prints with `pnpm -s context-packet -- <production-id>`.
+- **Regenerate prompt from template** writes a candidate to `.motion-studio/tmp/prompt-candidates/` and shows a diff. Your `prompt.md` changes only if you press **Replace saved prompt**.
 
 ## Settings
 

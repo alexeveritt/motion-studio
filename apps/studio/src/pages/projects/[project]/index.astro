@@ -1,6 +1,7 @@
 ---
 import { sectionCompleteness } from "@motion-studio/core";
 import ArchiveButton from "../../../components/ArchiveButton.tsx";
+import AssetLibrary from "../../../components/AssetLibrary.tsx";
 import ArchivedNotice from "../../../components/ArchivedNotice.astro";
 import Breadcrumbs from "../../../components/Breadcrumbs.astro";
 import CopyPath from "../../../components/CopyPath.tsx";
@@ -16,13 +17,15 @@ import {
   projectUrl,
 } from "../../../lib/server/pages.ts";
 
-const { workspace, catalog, profiles, archiveFolder } = await loadPageContext();
+const { workspace, assets, catalog, profiles, archiveFolder, maxUploadBytes } =
+  await loadPageContext();
 const project = findProject(catalog, Astro.params.project);
 
 const TABS = [
   { id: "overview", label: "Overview" },
   { id: "context", label: "Context" },
   { id: "brand", label: "Brand" },
+  { id: "assets", label: "Assets" },
   { id: "files", label: "Files" },
 ];
 const requested = Astro.url.searchParams.get("tab");
@@ -35,6 +38,10 @@ const brand =
     : undefined;
 const files =
   project && tab === "files" ? await workspace.listFiles("project", project.record.id) : [];
+const brandAssets =
+  project && tab === "assets" ? await assets.list("brand", project.record.id) : undefined;
+const projectAssets =
+  project && tab === "assets" ? await assets.list("project", project.record.id) : undefined;
 const sections = context ? sectionCompleteness(context.content) : [];
 const filled = sections.filter((s) => s.filled).length;
 ---
@@ -133,6 +140,28 @@ const filled = sections.filter((s) => s.filled).length;
           label="Brand guidance"
           initial={brand}
         />
+      )}
+      {tab === "assets" && brandAssets && projectAssets && (
+        <>
+          <AssetLibrary
+            client:load
+            scope="brand"
+            id={project.record.id}
+            title="Brand assets"
+            description="Logos, wordmarks, brand fonts and colour references."
+            initial={brandAssets}
+            maxUploadBytes={maxUploadBytes}
+          />
+          <AssetLibrary
+            client:load
+            scope="project"
+            id={project.record.id}
+            title="Project assets"
+            description="Reusable product visuals shared by every campaign."
+            initial={projectAssets}
+            maxUploadBytes={maxUploadBytes}
+          />
+        </>
       )}
       {tab === "files" && (
         <section class="panel">

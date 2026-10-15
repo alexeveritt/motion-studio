@@ -98,16 +98,30 @@ export function productionPromptTemplate(
   campaign: CampaignRecord,
   production: ProductionRecord,
 ): string {
+  const { width, height, fps, durationInFrames } = production.format;
   return `# Implement ${production.title}
 
-Implement the Remotion composition for this production.
+Implement the Remotion composition for **${production.title}** (\`${production.compositionId}\`), part of the ${campaign.name} campaign for ${project.name}.
 
-- Project: ${project.name}
-- Campaign: ${campaign.name}
-- Composition ID: \`${production.compositionId}\`
-- Entry file: \`${production.files.entry}\`
+${width} × ${height}, ${fps} fps, ${durationInFrames} frames (${formatDurationLabel(durationInFrames, fps)}). Poster frame ${production.posterFrame}.
 
-Read \`brief.md\` in this folder and the project \`context.md\` before starting. Keep all production-specific code inside this production folder. Do not commit or push.
+## Before you start
+
+- Print the full context packet: \`pnpm -s context-packet -- ${production.id}\` (also available from the Prompt tab in Motion Studio).
+- Read \`brief.md\` in this folder. It is the source of truth for the creative.
+
+## Scope
+
+- Edit only this production folder: \`src/\` and \`tests/\`. The entry file is \`${production.files.entry}\`.
+- Use assets by their stored names from this production's \`assets/\` folder or the campaign, project and brand asset folders.
+- Keep the composition deterministic: derive all motion from the current frame and props. No network access, clock reads or unseeded randomness.
+- Change format, duration or poster frame through Motion Studio rather than editing \`production.json\`.
+- Do not commit or push.
+
+## Done when
+
+- The acceptance criteria in \`brief.md\` are met.
+- \`pnpm check\` and \`pnpm validate:workspace\` pass.
 `;
 }
 

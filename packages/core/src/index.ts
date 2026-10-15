@@ -10,3 +10,7 @@ export * from "./fs-store.ts";
 export * from "./templates.ts";
 export * from "./workspace.ts";
 export * from "./markdown.ts";
+export * from "./media.ts";
+export * from "./assets.ts";
+export * from "./diff.ts";
+export * from "./context-packet.ts";

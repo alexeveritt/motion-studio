@@ -1,4 +1,5 @@
 import {
+  AssetLibrary,
   findRepoRoot,
   loadSettings,
   resolveWorkspaceRoot,
@@ -32,4 +33,12 @@ export function getWorkspace(): Promise<WorkspaceService> {
 /** The catalog is rebuilt from disk on every call; files are the source of truth. */
 export async function getCatalog(): Promise<Catalog> {
   return (await getWorkspace()).scan();
+}
+
+let assets: AssetLibrary | undefined;
+
+export async function getAssets(): Promise<AssetLibrary> {
+  const workspace = await getWorkspace();
+  assets ??= new AssetLibrary(workspace);
+  return assets;
 }
