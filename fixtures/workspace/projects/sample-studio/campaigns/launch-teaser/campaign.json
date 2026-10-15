@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "01a13edc-43a7-7742-9680-afe53695d484",
+  "projectId": "01a13edc-439a-72c4-9e44-ad989b9fff81",
+  "slug": "launch-teaser",
+  "name": "Launch Teaser",
+  "description": "Fixture campaign with two productions in different formats.",
+  "objective": "Exercise the catalog with more than one production format.",
+  "audience": ["Motion Studio developers"],
+  "keyMessages": ["Fixtures are not real work"],
+  "channels": ["Instagram feed", "Instagram stories"],
+  "status": "active",
+  "briefFile": "brief.md",
+  "createdAt": "2026-10-15T09:00:00.000Z",
+  "updatedAt": "2026-10-15T09:00:00.000Z",
+  "revision": 1
+}

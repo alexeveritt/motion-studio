@@ -1,0 +1,63 @@
+---
+import "../styles/global.css";
+
+type Props = { title: string };
+const { title } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>{title} · Motion Studio</title>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/">
+        Motion Studio
+      </a>
+      <span class="muted">Local workspace · 127.0.0.1</span>
+    </header>
+    <main>
+      <slot />
+    </main>
+    <footer class="site-footer muted">
+      Compositions are executable local code. Motion Studio is not a sandbox: only preview or render
+      source written or reviewed by you or your trusted coding agent.
+    </footer>
+  </body>
+</html>
+
+<style>
+  .site-header {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-4);
+    padding: var(--space-3) var(--space-5);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .brand {
+    font-weight: 700;
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: var(--space-5);
+    display: grid;
+    gap: var(--space-5);
+  }
+
+  .site-footer {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: var(--space-4) var(--space-5) var(--space-6);
+    font-size: 0.8rem;
+  }
+</style>

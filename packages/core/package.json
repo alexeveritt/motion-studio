@@ -1,0 +1,19 @@
+{
+  "name": "@motion-studio/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schemas": "./src/schemas/index.ts",
+    "./slug": "./src/slug.ts",
+    "./time": "./src/time.ts"
+  },
+  "scripts": {
+    "check": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "uuid": "14.0.3",
+    "zod": "4.6.7"
+  }
+}

@@ -1,0 +1,9 @@
+---
+const archived = Astro.url.searchParams.get("archived");
+---
+
+{archived && (
+  <div class="form-status" data-tone="ok" role="status">
+    Archived to <code>{archived}</code>.
+  </div>
+)}

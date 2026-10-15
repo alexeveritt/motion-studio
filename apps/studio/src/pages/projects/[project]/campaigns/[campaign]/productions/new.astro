@@ -1,0 +1,51 @@
+---
+import Breadcrumbs from "../../../../../../components/Breadcrumbs.astro";
+import NotFound from "../../../../../../components/NotFound.astro";
+import ProductionForm from "../../../../../../components/ProductionForm.tsx";
+import Base from "../../../../../../layouts/Base.astro";
+import {
+  campaignUrl,
+  findCampaign,
+  findProject,
+  loadPageContext,
+  projectUrl,
+} from "../../../../../../lib/server/pages.ts";
+
+const { catalog, profiles } = await loadPageContext();
+const project = findProject(catalog, Astro.params.project);
+const campaign = findCampaign(project, Astro.params.campaign);
+---
+
+<Base title="New production">
+  {!project || !campaign ? (
+    <NotFound what="Campaign" />
+  ) : (
+    <>
+      <Breadcrumbs
+        items={[
+          { label: project.record.name, href: projectUrl(project.record.slug) },
+          {
+            label: campaign.record.name,
+            href: campaignUrl(project.record.slug, campaign.record.slug),
+          },
+          { label: "New production" },
+        ]}
+      />
+      <section class="panel narrow">
+        <h1>New production</h1>
+        <p class="muted">
+          A production is one deliverable video. Its folder holds the brief, the Claude prompt,
+          assets, source and renders.
+        </p>
+        <ProductionForm
+          client:load
+          mode="create"
+          campaignId={campaign.record.id}
+          basePath={`${campaignUrl(project.record.slug, campaign.record.slug)}/productions`}
+          profiles={profiles}
+          defaultProfileId={project.record.defaultRenderProfileId}
+        />
+      </section>
+    </>
+  )}
+</Base>

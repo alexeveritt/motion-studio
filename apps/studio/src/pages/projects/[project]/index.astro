@@ -1,0 +1,152 @@
+---
+import { sectionCompleteness } from "@motion-studio/core";
+import ArchiveButton from "../../../components/ArchiveButton.tsx";
+import ArchivedNotice from "../../../components/ArchivedNotice.astro";
+import Breadcrumbs from "../../../components/Breadcrumbs.astro";
+import CopyPath from "../../../components/CopyPath.tsx";
+import MarkdownEditor from "../../../components/MarkdownEditor.tsx";
+import NotFound from "../../../components/NotFound.astro";
+import ProjectForm from "../../../components/ProjectForm.tsx";
+import Tabs from "../../../components/Tabs.astro";
+import Base from "../../../layouts/Base.astro";
+import {
+  campaignUrl,
+  findProject,
+  loadPageContext,
+  projectUrl,
+} from "../../../lib/server/pages.ts";
+
+const { workspace, catalog, profiles, archiveFolder } = await loadPageContext();
+const project = findProject(catalog, Astro.params.project);
+
+const TABS = [
+  { id: "overview", label: "Overview" },
+  { id: "context", label: "Context" },
+  { id: "brand", label: "Brand" },
+  { id: "files", label: "Files" },
+];
+const requested = Astro.url.searchParams.get("tab");
+const tab = TABS.some((t) => t.id === requested) ? requested! : "overview";
+
+const context = project && (await workspace.readDocument("project", project.record.id, "context"));
+const brand =
+  project && tab === "brand"
+    ? await workspace.readDocument("project", project.record.id, "brand")
+    : undefined;
+const files =
+  project && tab === "files" ? await workspace.listFiles("project", project.record.id) : [];
+const sections = context ? sectionCompleteness(context.content) : [];
+const filled = sections.filter((s) => s.filled).length;
+---
+
+<Base title={project?.record.name ?? "Project not found"}>
+  {!project ? (
+    <NotFound what="Project" />
+  ) : (
+    <>
+      <Breadcrumbs items={[{ label: project.record.name }]} />
+      <ArchivedNotice />
+      <header class="page-header">
+        <div>
+          <h1>{project.record.name}</h1>
+          {project.record.description && <p class="muted">{project.record.description}</p>}
+          <CopyPath client:idle path={project.path} />
+        </div>
+        <div class="header-meta">
+          <span class="badge" data-tone={project.record.status === "active" ? "ok" : "neutral"}>
+            {project.record.status}
+          </span>
+          <span
+            class="badge"
+            data-tone={sections.length > 0 && filled === sections.length ? "ok" : "warn"}
+          >
+            Context {filled}/{sections.length} sections
+          </span>
+        </div>
+      </header>
+
+      <Tabs tabs={TABS} active={tab} baseUrl={projectUrl(project.record.slug)} />
+
+      {tab === "overview" && (
+        <div class="two-column">
+          <section class="panel" aria-labelledby="campaigns-heading">
+            <div class="section-header">
+              <h2 id="campaigns-heading">Campaigns</h2>
+              <a class="button primary" href={`${projectUrl(project.record.slug)}/campaigns/new`}>
+                New campaign
+              </a>
+            </div>
+            {project.campaigns.length === 0 ? (
+              <p class="muted">No campaigns yet.</p>
+            ) : (
+              <ul class="entry-list">
+                {project.campaigns.map(({ record, productions }) => (
+                  <li>
+                    <a href={campaignUrl(project.record.slug, record.slug)}>{record.name}</a>{" "}
+                    <span class="badge">{record.status}</span>
+                    <div class="muted">
+                      {productions.length} {productions.length === 1 ? "production" : "productions"}
+                      {record.objective && ` · ${record.objective}`}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          <section class="panel" aria-labelledby="details-heading">
+            <h2 id="details-heading">Details</h2>
+            <ProjectForm client:load mode="edit" record={project.record} profiles={profiles} />
+            {project.record.sourceRepository && (
+              <p class="muted">
+                Source repository: <code>{project.record.sourceRepository.path}</code> (text only)
+              </p>
+            )}
+            <ArchiveButton
+              client:idle
+              scope="project"
+              id={project.record.id}
+              slug={project.record.slug}
+              redirectTo="/"
+              archiveFolder={archiveFolder}
+              includes="its campaigns and productions"
+            />
+          </section>
+        </div>
+      )}
+
+      {tab === "context" && context && (
+        <MarkdownEditor
+          client:load
+          scope="project"
+          id={project.record.id}
+          kind="context"
+          label="Project context"
+          initial={context}
+        />
+      )}
+      {tab === "brand" && brand && (
+        <MarkdownEditor
+          client:load
+          scope="project"
+          id={project.record.id}
+          kind="brand"
+          label="Brand guidance"
+          initial={brand}
+        />
+      )}
+      {tab === "files" && (
+        <section class="panel">
+          <h2>Files</h2>
+          <p class="muted">Project-level files. Campaign folders are listed on their own pages.</p>
+          <ul class="file-list">
+            {files.map((file) => (
+              <li>
+                <CopyPath client:visible path={file} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </>
+  )}
+</Base>

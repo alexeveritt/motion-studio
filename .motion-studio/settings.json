@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "workspaceRoot": "workspace/projects",
+  "server": {
+    "host": "127.0.0.1",
+    "port": 4321
+  },
+  "limits": {
+    "maxUploadBytes": 104857600,
+    "maxProjectBytes": 2147483648,
+    "maxWidth": 3840,
+    "maxHeight": 3840,
+    "maxFps": 60,
+    "maxDurationInFrames": 18000,
+    "renderTimeoutSeconds": 1800
+  },
+  "defaultRenderProfileId": "standard",
+  "renderProfiles": [
+    {
+      "id": "draft",
+      "name": "Draft",
+      "container": "mp4",
+      "codec": "h264",
+      "pixelFormat": "yuv420p",
+      "crf": 28,
+      "audioCodec": "aac",
+      "audioBitrate": "128k",
+      "concurrency": 4,
+      "imageFormat": "jpeg",
+      "scale": 0.5
+    },
+    {
+      "id": "standard",
+      "name": "Standard",
+      "container": "mp4",
+      "codec": "h264",
+      "pixelFormat": "yuv420p",
+      "crf": 20,
+      "audioCodec": "aac",
+      "audioBitrate": "192k",
+      "concurrency": 4,
+      "imageFormat": "jpeg",
+      "scale": 1
+    },
+    {
+      "id": "high-quality",
+      "name": "High quality",
+      "container": "mp4",
+      "codec": "h264",
+      "pixelFormat": "yuv420p",
+      "crf": 16,
+      "audioCodec": "aac",
+      "audioBitrate": "320k",
+      "concurrency": 4,
+      "imageFormat": "png",
+      "scale": 1
+    }
+  ],
+  "repositoryAliases": {}
+}

@@ -1,0 +1,177 @@
+---
+import { formatDurationLabel } from "@motion-studio/core";
+import ArchiveButton from "../../../../../components/ArchiveButton.tsx";
+import ArchivedNotice from "../../../../../components/ArchivedNotice.astro";
+import Breadcrumbs from "../../../../../components/Breadcrumbs.astro";
+import CampaignForm from "../../../../../components/CampaignForm.tsx";
+import CopyPath from "../../../../../components/CopyPath.tsx";
+import MarkdownEditor from "../../../../../components/MarkdownEditor.tsx";
+import NotFound from "../../../../../components/NotFound.astro";
+import Tabs from "../../../../../components/Tabs.astro";
+import Base from "../../../../../layouts/Base.astro";
+import { productionTone } from "../../../../../lib/format.ts";
+import {
+  campaignUrl,
+  findCampaign,
+  findProject,
+  loadPageContext,
+  productionUrl,
+  projectUrl,
+} from "../../../../../lib/server/pages.ts";
+
+const { workspace, catalog, archiveFolder } = await loadPageContext();
+const project = findProject(catalog, Astro.params.project);
+const campaign = findCampaign(project, Astro.params.campaign);
+
+const TABS = [
+  { id: "overview", label: "Overview" },
+  { id: "brief", label: "Brief" },
+  { id: "files", label: "Files" },
+];
+const requested = Astro.url.searchParams.get("tab");
+const tab = TABS.some((t) => t.id === requested) ? requested! : "overview";
+const brief =
+  campaign && tab === "brief"
+    ? await workspace.readDocument("campaign", campaign.record.id, "brief")
+    : undefined;
+const files =
+  campaign && tab === "files" ? await workspace.listFiles("campaign", campaign.record.id) : [];
+const listItems = (items: string[]) => (items.length > 0 ? items : ["—"]);
+---
+
+<Base title={campaign?.record.name ?? "Campaign not found"}>
+  {!project || !campaign ? (
+    <NotFound what="Campaign" />
+  ) : (
+    <>
+      <Breadcrumbs
+        items={[
+          { label: project.record.name, href: projectUrl(project.record.slug) },
+          { label: campaign.record.name },
+        ]}
+      />
+      <ArchivedNotice />
+      <header class="page-header">
+        <div>
+          <h1>{campaign.record.name}</h1>
+          {campaign.record.description && <p class="muted">{campaign.record.description}</p>}
+          <CopyPath client:idle path={campaign.path} />
+        </div>
+        <div class="header-meta">
+          <span class="badge">{campaign.record.status}</span>
+        </div>
+      </header>
+
+      <Tabs
+        tabs={TABS}
+        active={tab}
+        baseUrl={campaignUrl(project.record.slug, campaign.record.slug)}
+      />
+
+      {tab === "overview" && (
+        <>
+          <section class="panel facts">
+            <div>
+              <h2>Objective</h2>
+              <p>{campaign.record.objective || "—"}</p>
+            </div>
+            <div>
+              <h3>Audience</h3>
+              <ul>
+                {listItems(campaign.record.audience).map((item) => (
+                  <li>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3>Key messages</h3>
+              <ul>
+                {listItems(campaign.record.keyMessages).map((item) => (
+                  <li>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3>Channels</h3>
+              <ul>
+                {listItems(campaign.record.channels).map((item) => (
+                  <li>{item}</li>
+                ))}
+              </ul>
+            </div>
+          </section>
+          <div class="two-column">
+            <section class="panel" aria-labelledby="productions-heading">
+              <div class="section-header">
+                <h2 id="productions-heading">Productions</h2>
+                <a
+                  class="button primary"
+                  href={`${campaignUrl(project.record.slug, campaign.record.slug)}/productions/new`}
+                >
+                  New production
+                </a>
+              </div>
+              {campaign.productions.length === 0 ? (
+                <p class="muted">No productions yet.</p>
+              ) : (
+                <ul class="entry-list">
+                  {campaign.productions.map(({ record }) => (
+                    <li>
+                      <a
+                        href={productionUrl(project.record.slug, campaign.record.slug, record.slug)}
+                      >
+                        {record.title}
+                      </a>{" "}
+                      <span class="badge" data-tone={productionTone(record.status)}>
+                        {record.status}
+                      </span>
+                      <div class="muted">
+                        {record.format.width}×{record.format.height} ·{" "}
+                        {formatDurationLabel(record.format.durationInFrames, record.format.fps)}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+            <section class="panel" aria-labelledby="details-heading">
+              <h2 id="details-heading">Details</h2>
+              <CampaignForm client:load mode="edit" record={campaign.record} />
+              <ArchiveButton
+                client:idle
+                scope="campaign"
+                id={campaign.record.id}
+                slug={campaign.record.slug}
+                redirectTo={projectUrl(project.record.slug)}
+                archiveFolder={archiveFolder}
+                includes="its productions"
+              />
+            </section>
+          </div>
+        </>
+      )}
+      {tab === "brief" && brief && (
+        <MarkdownEditor
+          client:load
+          scope="campaign"
+          id={campaign.record.id}
+          kind="brief"
+          label="Campaign brief"
+          initial={brief}
+        />
+      )}
+      {tab === "files" && (
+        <section class="panel">
+          <h2>Files</h2>
+          <ul class="file-list">
+            {files.map((file) => (
+              <li>
+                <CopyPath client:visible path={file} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </>
+  )}
+</Base>

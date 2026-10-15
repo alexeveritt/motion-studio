@@ -1,0 +1,19 @@
+# Dependencies and build output
+node_modules/
+dist/
+.astro/
+coverage/
+test-results/
+playwright-report/
+
+# Motion Studio ephemeral state (see docs/SPEC.md section 14)
+.motion-studio/cache/
+.motion-studio/jobs/
+.motion-studio/tmp/
+**/renders/previews/
+**/*.partial.mp4
+
+# OS and editor noise
+**/.DS_Store
+.env
+.env.*

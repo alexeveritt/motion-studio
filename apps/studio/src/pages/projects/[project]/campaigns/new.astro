@@ -1,0 +1,35 @@
+---
+import Breadcrumbs from "../../../../components/Breadcrumbs.astro";
+import CampaignForm from "../../../../components/CampaignForm.tsx";
+import NotFound from "../../../../components/NotFound.astro";
+import Base from "../../../../layouts/Base.astro";
+import { findProject, loadPageContext, projectUrl } from "../../../../lib/server/pages.ts";
+
+const { catalog } = await loadPageContext();
+const project = findProject(catalog, Astro.params.project);
+---
+
+<Base title="New campaign">
+  {!project ? (
+    <NotFound what="Project" />
+  ) : (
+    <>
+      <Breadcrumbs
+        items={[
+          { label: project.record.name, href: projectUrl(project.record.slug) },
+          { label: "New campaign" },
+        ]}
+      />
+      <section class="panel narrow">
+        <h1>New campaign</h1>
+        <p class="muted">A campaign groups productions that share an objective and audience.</p>
+        <CampaignForm
+          client:load
+          mode="create"
+          projectId={project.record.id}
+          projectSlug={project.record.slug}
+        />
+      </section>
+    </>
+  )}
+</Base>

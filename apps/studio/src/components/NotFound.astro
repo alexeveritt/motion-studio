@@ -1,0 +1,13 @@
+---
+type Props = { what: string };
+const { what } = Astro.props;
+Astro.response.status = 404;
+---
+
+<section class="panel" role="alert">
+  <h1>{what} not found</h1>
+  <p>
+    It may have been archived, renamed on disk, or have a validation error.{" "}
+    <a href="/">Back to the dashboard</a>.
+  </p>
+</section>

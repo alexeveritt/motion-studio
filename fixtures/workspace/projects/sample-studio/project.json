@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "01a13edc-439a-72c4-9e44-ad989b9fff81",
+  "slug": "sample-studio",
+  "name": "Sample Studio",
+  "description": "Fixture project used by tests and `pnpm dev:fixtures`. Not real creative work.",
+  "status": "active",
+  "defaultRenderProfileId": "standard",
+  "contextFile": "context.md",
+  "brandFile": "brand/brand.md",
+  "createdAt": "2026-10-15T09:00:00.000Z",
+  "updatedAt": "2026-10-15T09:00:00.000Z",
+  "revision": 1
+}

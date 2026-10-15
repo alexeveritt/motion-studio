@@ -1,0 +1,25 @@
+---
+import Breadcrumbs from "../../components/Breadcrumbs.astro";
+import ProjectForm from "../../components/ProjectForm.tsx";
+import Base from "../../layouts/Base.astro";
+import { loadPageContext } from "../../lib/server/pages.ts";
+
+const { workspace, profiles } = await loadPageContext();
+---
+
+<Base title="New project">
+  <Breadcrumbs items={[{ label: "New project" }]} />
+  <section class="panel narrow">
+    <h1>New project</h1>
+    <p class="muted">
+      A project is a brand or product. It holds context, brand guidance, shared assets and
+      campaigns.
+    </p>
+    <ProjectForm
+      client:load
+      mode="create"
+      profiles={profiles}
+      defaultProfileId={workspace.settings.defaultRenderProfileId}
+    />
+  </section>
+</Base>

@@ -1,0 +1,225 @@
+---
+import { formatDurationLabel, formatTimecode, sectionCompleteness } from "@motion-studio/core";
+import ArchiveButton from "../../../../../../components/ArchiveButton.tsx";
+import Breadcrumbs from "../../../../../../components/Breadcrumbs.astro";
+import CopyPath from "../../../../../../components/CopyPath.tsx";
+import MarkdownEditor from "../../../../../../components/MarkdownEditor.tsx";
+import NotFound from "../../../../../../components/NotFound.astro";
+import ProductionForm from "../../../../../../components/ProductionForm.tsx";
+import Tabs from "../../../../../../components/Tabs.astro";
+import Base from "../../../../../../layouts/Base.astro";
+import { productionTone } from "../../../../../../lib/format.ts";
+import {
+  campaignUrl,
+  findCampaign,
+  findProduction,
+  findProject,
+  loadPageContext,
+  productionUrl,
+  projectUrl,
+} from "../../../../../../lib/server/pages.ts";
+
+const { workspace, catalog, profiles, archiveFolder } = await loadPageContext();
+const project = findProject(catalog, Astro.params.project);
+const campaign = findCampaign(project, Astro.params.campaign);
+const production = findProduction(campaign, Astro.params.production);
+
+const TABS = [
+  { id: "overview", label: "Overview" },
+  { id: "brief", label: "Brief" },
+  { id: "prompt", label: "Prompt" },
+  { id: "notes", label: "Notes" },
+  { id: "files", label: "Files" },
+];
+const requested = Astro.url.searchParams.get("tab");
+const tab = TABS.some((t) => t.id === requested) ? requested! : "overview";
+const id = production?.record.id;
+
+const brief = id ? await workspace.readDocument("production", id, "brief") : undefined;
+const documentTab =
+  id && (tab === "prompt" || tab === "notes")
+    ? await workspace.readDocument("production", id, tab)
+    : undefined;
+const files = id && tab === "files" ? await workspace.listFiles("production", id) : [];
+const sections = brief ? sectionCompleteness(brief.content) : [];
+const filled = sections.filter((s) => s.filled).length;
+const profile = workspace.settings.renderProfiles.find(
+  (p) => p.id === production?.record.defaultRenderProfileId,
+);
+const issues = catalog.issues.filter(
+  (issue) => production && issue.path.startsWith(production.path),
+);
+---
+
+<Base title={production?.record.title ?? "Production not found"}>
+  {!project || !campaign || !production ? (
+    <NotFound what="Production" />
+  ) : (
+    <>
+      <Breadcrumbs
+        items={[
+          { label: project.record.name, href: projectUrl(project.record.slug) },
+          {
+            label: campaign.record.name,
+            href: campaignUrl(project.record.slug, campaign.record.slug),
+          },
+          { label: production.record.title },
+        ]}
+      />
+      <header class="page-header">
+        <div>
+          <h1>{production.record.title}</h1>
+          <p class="muted">
+            {production.record.format.width}×{production.record.format.height} ·{" "}
+            {production.record.format.fps} fps · {production.record.format.durationInFrames} frames
+            (
+            {formatDurationLabel(
+              production.record.format.durationInFrames,
+              production.record.format.fps,
+            )}
+            ) · poster frame {production.record.posterFrame} (
+            {formatTimecode(production.record.posterFrame, production.record.format.fps)})
+          </p>
+          <CopyPath client:idle path={production.path} />
+        </div>
+        <div class="header-meta">
+          <span class="badge" data-tone={productionTone(production.record.status)}>
+            {production.record.status}
+          </span>
+          <span
+            class="badge"
+            data-tone={
+              issues.some((i) => i.severity === "error") ? "error" : issues.length ? "warn" : "ok"
+            }
+          >
+            {issues.length === 0 ? "Valid" : `${issues.length} issues`}
+          </span>
+          <span
+            class="badge"
+            data-tone={sections.length > 0 && filled === sections.length ? "ok" : "warn"}
+          >
+            Brief {filled}/{sections.length}
+          </span>
+        </div>
+      </header>
+
+      <Tabs
+        tabs={TABS}
+        active={tab}
+        baseUrl={productionUrl(project.record.slug, campaign.record.slug, production.record.slug)}
+      />
+
+      {tab === "overview" && (
+        <div class="two-column">
+          <section class="panel facts">
+            <div>
+              <h2>Composition</h2>
+              <p>
+                <code>{production.record.compositionId}</code>
+              </p>
+              <p class="muted">
+                Entry file <code>{production.record.files.entry}</code>. Preview and rendering
+                arrive in later milestones.
+              </p>
+            </div>
+            <div>
+              <h3>Default render profile</h3>
+              <p>
+                {profile
+                  ? `${profile.name} (CRF ${profile.crf}, scale ${profile.scale ?? 1})`
+                  : production.record.defaultRenderProfileId}
+              </p>
+            </div>
+            {production.record.tags.length > 0 && (
+              <div>
+                <h3>Tags</h3>
+                <p>
+                  {production.record.tags.map((t) => (
+                    <span class="badge">{t}</span>
+                  ))}
+                </p>
+              </div>
+            )}
+            {issues.length > 0 && (
+              <div>
+                <h3>Validation</h3>
+                <ul>
+                  {issues.map((issue) => (
+                    <li>
+                      <span class="badge" data-tone={issue.severity === "error" ? "error" : "warn"}>
+                        {issue.code}
+                      </span>{" "}
+                      {issue.message}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
+          <section class="panel" aria-labelledby="details-heading">
+            <h2 id="details-heading">Details</h2>
+            <ProductionForm
+              client:load
+              mode="edit"
+              record={production.record}
+              profiles={profiles}
+            />
+            <ArchiveButton
+              client:idle
+              scope="production"
+              id={production.record.id}
+              slug={production.record.slug}
+              redirectTo={campaignUrl(project.record.slug, campaign.record.slug)}
+              archiveFolder={archiveFolder}
+            />
+          </section>
+        </div>
+      )}
+      {tab === "brief" && brief && (
+        <MarkdownEditor
+          client:load
+          scope="production"
+          id={production.record.id}
+          kind="brief"
+          label="Production brief"
+          initial={brief}
+        />
+      )}
+      {tab === "prompt" && documentTab && (
+        <MarkdownEditor
+          client:load
+          scope="production"
+          id={production.record.id}
+          kind="prompt"
+          label="Claude prompt"
+          initial={documentTab}
+        />
+      )}
+      {tab === "notes" && documentTab && (
+        <MarkdownEditor
+          client:load
+          scope="production"
+          id={production.record.id}
+          kind="notes"
+          label="Notes"
+          initial={documentTab}
+        />
+      )}
+      {tab === "files" && (
+        <section class="panel">
+          <h2>Files</h2>
+          <p class="muted">
+            Repository-relative paths inside this production folder. Render previews are excluded.
+          </p>
+          <ul class="file-list">
+            {files.map((file) => (
+              <li>
+                <CopyPath client:visible path={file} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </>
+  )}
+</Base>

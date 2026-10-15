@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "01a13edc-43a7-7742-9680-b790ae951fdf",
+  "projectId": "01a13edc-439a-72c4-9e44-ad989b9fff81",
+  "campaignId": "01a13edc-43a7-7742-9680-afe53695d484",
+  "slug": "vertical-story",
+  "title": "Vertical Story",
+  "description": "Fixture production.",
+  "status": "idea",
+  "compositionId": "sample-studio-vertical-story",
+  "format": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "durationInFrames": 300
+  },
+  "files": {
+    "brief": "brief.md",
+    "prompt": "prompt.md",
+    "notes": "notes.md",
+    "entry": "src/composition.tsx"
+  },
+  "defaultRenderProfileId": "standard",
+  "posterFrame": 240,
+  "tags": ["fixture"],
+  "createdAt": "2026-10-15T09:00:00.000Z",
+  "updatedAt": "2026-10-15T09:00:00.000Z",
+  "revision": 1
+}

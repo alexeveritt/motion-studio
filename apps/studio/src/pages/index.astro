@@ -1,0 +1,195 @@
+---
+import { MotionStudioError, type Catalog } from "@motion-studio/core";
+import ArchivedNotice from "../components/ArchivedNotice.astro";
+import Base from "../layouts/Base.astro";
+import { formatSummary, productionTone } from "../lib/format.ts";
+import { campaignUrl, productionUrl, projectUrl } from "../lib/server/pages.ts";
+import { getCatalog } from "../lib/server/studio.ts";
+
+let catalog: Catalog | undefined;
+let loadError: string | undefined;
+try {
+  catalog = await getCatalog();
+} catch (error) {
+  loadError =
+    error instanceof MotionStudioError ? error.message : "The workspace could not be loaded.";
+  if (!(error instanceof MotionStudioError)) console.error(error);
+}
+
+const projects = catalog?.projects ?? [];
+const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
+const issues = catalog?.issues ?? [];
+const errorCount = issues.filter((issue) => issue.severity === "error").length;
+const recent = projects
+  .flatMap((project) =>
+    project.campaigns.flatMap((campaign) =>
+      campaign.productions.map((production) => ({ project, campaign, production })),
+    ),
+  )
+  .sort((a, b) => b.production.record.updatedAt.localeCompare(a.production.record.updatedAt))
+  .slice(0, 8);
+---
+
+<Base title="Dashboard">
+  <header class="page-header">
+    <div>
+      <h1>Dashboard</h1>
+      {catalog && (
+        <p class="muted">
+          Workspace <code>{catalog.workspacePath}</code>
+        </p>
+      )}
+    </div>
+    <a class="button primary" href="/projects/new">
+      New project
+    </a>
+  </header>
+  <ArchivedNotice />
+
+  {loadError && (
+    <section class="panel" role="alert">
+      <h2>Workspace unavailable</h2>
+      <p>{loadError}</p>
+    </section>
+  )}
+
+  {issues.length > 0 && (
+    <section class="panel issues" aria-labelledby="issues-heading">
+      <h2 id="issues-heading">
+        Validation{" "}
+        <span class="badge" data-tone={errorCount > 0 ? "error" : "warn"}>
+          {issues.length} {issues.length === 1 ? "issue" : "issues"}
+        </span>
+      </h2>
+      <p class="muted">Records with errors are hidden from the catalog until they are fixed.</p>
+      <ul>
+        {issues.map((issue) => (
+          <li>
+            <span class="badge" data-tone={issue.severity === "error" ? "error" : "warn"}>
+              {issue.code}
+            </span>{" "}
+            <code>{issue.path}</code>
+            <div>{issue.message}</div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+
+  {catalog && projects.length === 0 && (
+    <section class="panel">
+      <h2>No projects yet</h2>
+      <p>
+        Projects are stored in <code>{catalog.workspacePath}</code>.{" "}
+        <a href="/projects/new">Create your first project</a>, or run <code>pnpm dev:fixtures</code>{" "}
+        to explore sample data.
+      </p>
+    </section>
+  )}
+
+  {projects.length > 0 && (
+    <section aria-labelledby="projects-heading">
+      <h2 id="projects-heading" class="section-title">
+        Projects
+      </h2>
+      <ul class="card-grid">
+        {projects.map(({ record, campaigns }) => (
+          <li class="panel card">
+            <a class="card-title" href={projectUrl(record.slug)}>
+              {record.name}
+            </a>
+            <span class="badge" data-tone={record.status === "active" ? "ok" : "neutral"}>
+              {record.status}
+            </span>
+            {record.description && <p class="muted">{record.description}</p>}
+            <p class="muted">
+              {plural(campaigns.length, "campaign")} ·{" "}
+              {plural(
+                campaigns.reduce((n, c) => n + c.productions.length, 0),
+                "production",
+              )}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+
+  {recent.length > 0 && (
+    <section class="panel" aria-labelledby="recent-heading">
+      <h2 id="recent-heading">Recent productions</h2>
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Production</th>
+            <th scope="col">Campaign</th>
+            <th scope="col">Status</th>
+            <th scope="col">Format</th>
+          </tr>
+        </thead>
+        <tbody>
+          {recent.map(({ project, campaign, production }) => (
+            <tr>
+              <td>
+                <a
+                  href={productionUrl(
+                    project.record.slug,
+                    campaign.record.slug,
+                    production.record.slug,
+                  )}
+                >
+                  {production.record.title}
+                </a>
+              </td>
+              <td>
+                <a href={campaignUrl(project.record.slug, campaign.record.slug)}>
+                  {campaign.record.name}
+                </a>
+                <div class="muted">{project.record.name}</div>
+              </td>
+              <td>
+                <span class="badge" data-tone={productionTone(production.record.status)}>
+                  {production.record.status}
+                </span>
+              </td>
+              <td>{formatSummary(production.record.format)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  )}
+</Base>
+
+<style>
+  .issues ul {
+    list-style: none;
+    padding: 0;
+    margin: var(--space-3) 0 0;
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .section-title {
+    margin-bottom: var(--space-3);
+  }
+
+  .card-grid {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .card p {
+    margin: var(--space-2) 0 0;
+  }
+
+  .card-title {
+    font-weight: 650;
+    font-size: 1.05rem;
+    margin-right: var(--space-2);
+  }
+</style>
