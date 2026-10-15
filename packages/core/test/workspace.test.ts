@@ -86,7 +86,7 @@ describe("creation", () => {
       "cookguide/campaigns/qr-awareness/productions/cookguide-qr-code-advert/prompt.md",
       "cookguide/campaigns/qr-awareness/productions/cookguide-qr-code-advert/renders/final/.gitkeep",
       "cookguide/campaigns/qr-awareness/productions/cookguide-qr-code-advert/renders/manifests/.gitkeep",
-      "cookguide/campaigns/qr-awareness/productions/cookguide-qr-code-advert/src/.gitkeep",
+      "cookguide/campaigns/qr-awareness/productions/cookguide-qr-code-advert/src/composition.tsx",
       "cookguide/campaigns/qr-awareness/productions/cookguide-qr-code-advert/tests/.gitkeep",
       "cookguide/context.md",
       "cookguide/project.json",

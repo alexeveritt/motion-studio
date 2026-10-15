@@ -675,3 +675,147 @@ pre.diff span[data-op="remove"] {
   display: grid;
   gap: var(--space-2);
 }
+
+/* ----------------------------------------------------------- preview */
+
+.preview {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.preview-stage {
+  display: grid;
+  place-items: center;
+  background: #0d0e10;
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  height: min(62vh, 820px);
+  overflow: auto;
+}
+
+.preview-stage[data-zoom="fit"] .preview-frame {
+  height: 100%;
+  max-width: 100%;
+}
+
+.preview-stage:not([data-zoom="fit"]) {
+  place-items: start center;
+}
+
+.preview-frame {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.preview-controls,
+.preview-options {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.preview-controls button {
+  min-width: 44px;
+  padding: var(--space-1) var(--space-3);
+}
+
+.frame-entry {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.frame-entry label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+}
+
+.frame-entry input {
+  width: 6.5em;
+  font-variant-numeric: tabular-nums;
+}
+
+.timecode {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  padding: var(--space-1) var(--space-2);
+  background: var(--surface-muted);
+  border-radius: var(--radius);
+}
+
+.scrubber {
+  width: 100%;
+  padding: 0;
+  accent-color: var(--accent);
+}
+
+.preview-options label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.preview-options input[type="range"] {
+  width: 120px;
+  padding: 0;
+}
+
+.preview-options input[type="checkbox"] {
+  width: auto;
+}
+
+.zoom {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.preview-error {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  background: #2a0f0f;
+  color: #ffd9d6;
+  padding: 4%;
+  font-size: 16px;
+  font-family: var(--font-sans);
+}
+
+.preview-error pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+
+.preview > .preview-error {
+  position: static;
+  border-radius: var(--radius);
+}
+
+.preview-status {
+  padding: var(--space-4);
+}
+
+.trust-note {
+  font-size: 0.8rem;
+}
+
+.source-check {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.diagnostics {
+  flex-basis: 100%;
+  margin: 0;
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-6);
+  background: var(--error-bg);
+  color: var(--error-text);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}

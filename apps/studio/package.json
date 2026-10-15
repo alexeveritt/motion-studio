@@ -13,10 +13,13 @@
     "@astrojs/node": "11.1.7",
     "@astrojs/react": "7.0.1",
     "@motion-studio/core": "workspace:*",
+    "@motion-studio/motion-runtime": "workspace:*",
+    "@remotion/player": "4.0.535",
     "astro": "7.3.8",
     "markdown-it": "15.0.2",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "remotion": "4.0.535",
     "zod": "4.6.7"
   },
   "devDependencies": {

@@ -14,3 +14,5 @@ export * from "./media.ts";
 export * from "./assets.ts";
 export * from "./diff.ts";
 export * from "./context-packet.ts";
+export * from "./registry.ts";
+export * from "./compile-check.ts";

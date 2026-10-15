@@ -7,10 +7,12 @@ import CopyPath from "../../../../../../components/CopyPath.tsx";
 import MarkdownEditor from "../../../../../../components/MarkdownEditor.tsx";
 import NotFound from "../../../../../../components/NotFound.astro";
 import ProductionForm from "../../../../../../components/ProductionForm.tsx";
+import ProductionPreview from "../../../../../../components/ProductionPreview.tsx";
 import PromptTools from "../../../../../../components/PromptTools.tsx";
 import Tabs from "../../../../../../components/Tabs.astro";
 import Base from "../../../../../../layouts/Base.astro";
 import { productionTone } from "../../../../../../lib/format.ts";
+import { refreshRegistry } from "../../../../../../lib/server/studio.ts";
 import {
   campaignUrl,
   findCampaign,
@@ -29,6 +31,7 @@ const production = findProduction(campaign, Astro.params.production);
 
 const TABS = [
   { id: "overview", label: "Overview" },
+  { id: "preview", label: "Preview" },
   { id: "brief", label: "Brief" },
   { id: "prompt", label: "Prompt" },
   { id: "notes", label: "Notes" },
@@ -46,6 +49,10 @@ const documentTab =
     : undefined;
 const files = id && tab === "files" ? await workspace.listFiles("production", id) : [];
 const productionAssets = id && tab === "assets" ? await assets.list("production", id) : undefined;
+// Pick up entry files created since startup (for example by Claude Code).
+const registry = id && tab === "preview" ? await refreshRegistry() : undefined;
+const productionProps =
+  id && tab === "preview" ? await workspace.readProductionProps(id) : undefined;
 const sections = brief ? sectionCompleteness(brief.content) : [];
 const filled = sections.filter((s) => s.filled).length;
 const profile = workspace.settings.renderProfiles.find(
@@ -123,8 +130,8 @@ const issues = catalog.issues.filter(
                 <code>{production.record.compositionId}</code>
               </p>
               <p class="muted">
-                Entry file <code>{production.record.files.entry}</code>. Preview and rendering
-                arrive in later milestones. Use the Prompt tab to hand the work to Claude Code.
+                Entry file <code>{production.record.files.entry}</code>. Rendering arrives in
+                Milestone 4. Use the Prompt tab to hand the work to Claude Code.
               </p>
             </div>
             <div>
@@ -179,6 +186,26 @@ const issues = catalog.issues.filter(
             />
           </section>
         </div>
+      )}
+      {tab === "preview" && registry && productionProps && (
+        <>
+          <ProductionPreview
+            client:only="react"
+            productionId={production.record.id}
+            compositionId={production.record.compositionId}
+            entryPath={`${production.path}/${production.record.files.entry}`}
+            format={production.record.format}
+            posterFrame={production.record.posterFrame}
+            productionProps={productionProps.props}
+            propsPath={productionProps.path}
+            registered={production.record.compositionId in registry.entries}
+            {...(productionProps.error ? { propsError: productionProps.error } : {})}
+          />
+          <p class="muted trust-note">
+            The preview runs the production's source code in this browser tab. Only preview code you
+            or your trusted coding agent wrote or reviewed.
+          </p>
+        </>
       )}
       {tab === "brief" && brief && (
         <MarkdownEditor

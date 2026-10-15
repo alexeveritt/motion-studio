@@ -108,6 +108,13 @@ export const composition: MotionStudioComposition = {
 
 \`MotionStudioComposition\` comes from \`packages/motion-runtime\`. Width, height, FPS and duration come from \`production.json\`; do not hard-code them.
 
+Assets, fonts and props:
+
+- Reach assets only through \`useAsset("<scope>:<stored name>")\` from \`@motion-studio/motion-runtime\`, where scope is \`production\`, \`campaign\`, \`project\` or \`brand\`, e.g. \`useAsset("brand:logo.svg")\`. Only registered assets (those with a \`.asset.json\` sidecar) resolve. Use Remotion's \`<Img>\`, \`<Audio>\` and \`<Video>\` with the returned URL.
+- Load fonts from font assets with \`useLocalFont({ family, url: useAsset("brand:font.woff2") })\`.
+- Production-specific values (destination URLs, dates, copy variants) go in \`props.json\` in the production folder; it is merged over \`defaultProps\` for preview and render.
+- \`SafeArea\`, \`seededRange\` and \`seededInt\` are also exported by the runtime.
+
 Determinism rules:
 
 - Derive all animation from \`useCurrentFrame()\`, FPS, props and local assets.
@@ -169,7 +176,7 @@ pnpm validate:workspace    # validate every record, sidecar and asset hash
 pnpm -s context-packet -- ${record.id}   # print this packet again
 \`\`\`
 
-Preview the production in the studio (\`pnpm dev\`)${studioLink ? ` at ${studioLink}` : ""}.`,
+Preview the production in the studio (\`pnpm dev\`)${studioLink ? `: ${studioLink}?tab=preview` : ", Preview tab"}. The Preview tab's **Check source** button type-checks this production's \`src/\` and lists errors with file and line.`,
   ];
 
   return `${sections

@@ -37,7 +37,7 @@ export const onRequest = defineMiddleware(async ({ request, url }, next) => {
         "script-src 'self' 'unsafe-inline'",
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: blob:",
-        "media-src 'self' blob:",
+        "media-src 'self' blob: data:",
         "font-src 'self' data:",
         "connect-src 'self' ws://127.0.0.1:* ws://localhost:*",
         "object-src 'none'",

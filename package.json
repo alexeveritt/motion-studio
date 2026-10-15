@@ -11,7 +11,7 @@
   "scripts": {
     "dev": "pnpm --filter @motion-studio/studio dev",
     "dev:fixtures": "MOTION_STUDIO_WORKSPACE=fixtures/workspace/projects pnpm --filter @motion-studio/studio dev",
-    "check": "pnpm -r --workspace-concurrency=1 check",
+    "check": "tsc -p tsconfig.json && pnpm -r --workspace-concurrency=1 check",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
@@ -26,6 +26,7 @@
     "@motion-studio/core": "workspace:*",
     "@playwright/test": "1.64.0",
     "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
     "eslint": "10.12.0",
     "eslint-plugin-astro": "3.2.1",
     "globals": "17.13.0",
@@ -34,5 +35,11 @@
     "typescript": "6.0.3",
     "typescript-eslint": "8.71.2",
     "vitest": "5.0.4"
+  },
+  "dependencies": {
+    "@motion-studio/motion-runtime": "workspace:*",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "remotion": "4.0.535"
   }
 }

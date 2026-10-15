@@ -7,6 +7,19 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@motion-studio/motion-runtime':
+        specifier: workspace:*
+        version: link:packages/motion-runtime
+      react:
+        specifier: 19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: 19.3.0
+        version: 19.3.0(react@19.3.0)
+      remotion:
+        specifier: 4.0.535
+        version: 4.0.535(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
     devDependencies:
       '@eslint/js':
         specifier: 10.0.1
@@ -20,6 +33,9 @@ importers:
       '@types/node':
         specifier: 24.19.2
         version: 24.19.2
+      '@types/react':
+        specifier: 19.3.0
+        version: 19.3.0
       eslint:
         specifier: 10.12.0
         version: 10.12.0
@@ -56,6 +72,12 @@ importers:
       '@motion-studio/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@motion-studio/motion-runtime':
+        specifier: workspace:*
+        version: link:../../packages/motion-runtime
+      '@remotion/player':
+        specifier: 4.0.535
+        version: 4.0.535(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       astro:
         specifier: 7.3.8
         version: 7.3.8(@types/node@24.19.2)(yaml@2.9.1)
@@ -68,6 +90,9 @@ importers:
       react-dom:
         specifier: 19.3.0
         version: 19.3.0(react@19.3.0)
+      remotion:
+        specifier: 4.0.535
+        version: 4.0.535(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -87,12 +112,28 @@ importers:
 
   packages/core:
     dependencies:
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
       uuid:
         specifier: 14.0.3
         version: 14.0.3
       zod:
         specifier: 4.6.7
         version: 4.6.7
+
+  packages/motion-runtime:
+    dependencies:
+      react:
+        specifier: 19.3.0
+        version: 19.3.0
+      remotion:
+        specifier: 4.0.535
+        version: 4.0.535(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+    devDependencies:
+      '@types/react':
+        specifier: 19.3.0
+        version: 19.3.0
 
 packages:
 
@@ -689,6 +730,12 @@ packages:
 
   '@prettier/parse-srcset@3.1.0':
     resolution: {integrity: sha512-FIRv2rZotO9NP/r66taYqD1zICpPiBbrECqjKV/xqNotqDxF7fLzzUeK+1RSRx9Tenk0DajR/GcRmTJ2qtHaKQ==}
+
+  '@remotion/player@4.0.535':
+    resolution: {integrity: sha512-FYbw2frv8M49LB9NrAmc6A9LCRqZhI6QxeJ9tJKGB9JZg+DLaz8x3zrhuqC3tHfkbsqZOauRZSK6FbT7f8uXgg==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
 
   '@rolldown/binding-android-arm-eabi@1.2.13':
     resolution: {integrity: sha512-Vu/NICrgdRvUOeaJZIyB2FP63s6fO/4ud5l8dXmxDx9yDyn+mN0y+gsvsVviSli+T361Aqo0h46EuMoobrwawA==}
@@ -1865,6 +1912,12 @@ packages:
   regex@6.1.0:
     resolution: {integrity: sha512-6VwtthbV4o/7+OaAF9I5L5V3llLEsoPyq9P1JVXkedTP33c7MfCG0/5NOPcSJn0TzXcG9YUrR0gQSWioew3LDg==}
 
+  remotion@4.0.535:
+    resolution: {integrity: sha512-BfrVKlgo2+g3VcjFoHMhkLrJgwyX+IgEbljwKiZ6M+UCJlvpHhXkfT968iYfr+1VDvH5JWQUIUmHQhoU9PLCEw==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
+
   request-light@0.5.8:
     resolution: {integrity: sha512-3Zjgh+8b5fhRJBQZoy+zbVKpAQGLyka0MPgW3zruTF4dFFJ8Fqcfu9YsAvi/rvdcaTeWG3MkbZv4WKxAn/84Lg==}
 
@@ -3024,6 +3077,12 @@ snapshots:
       playwright: 1.64.0
 
   '@prettier/parse-srcset@3.1.0': {}
+
+  '@remotion/player@4.0.535(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+    dependencies:
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
+      remotion: 4.0.535(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
 
   '@rolldown/binding-android-arm-eabi@1.2.13':
     optional: true
@@ -4193,6 +4252,11 @@ snapshots:
   regex@6.1.0:
     dependencies:
       regex-utilities: 2.3.0
+
+  remotion@4.0.535(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
+    dependencies:
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
 
   request-light@0.5.8: {}
 

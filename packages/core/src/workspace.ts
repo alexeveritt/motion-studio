@@ -41,6 +41,7 @@ import type { Settings } from "./schemas/settings.ts";
 import { SLUG_MAX_LENGTH, slugify } from "./slug.ts";
 import {
   brandTemplate,
+  productionCompositionTemplate,
   campaignBriefTemplate,
   productionBriefTemplate,
   productionNotesTemplate,
@@ -77,6 +78,16 @@ const RECORD_SCHEMAS = {
 } as const;
 
 const KEEP = ".gitkeep";
+const PROPS_FILE = "props.json";
+const MAX_PROPS_BYTES = 256 * 1024;
+
+export type ProductionProps = {
+  /** Repository-relative path of props.json. */
+  path: string;
+  exists: boolean;
+  props: Record<string, unknown>;
+  error?: string;
+};
 
 export function hashContent(content: string): string {
   return createHash("sha256").update(content, "utf8").digest("hex");
@@ -94,6 +105,8 @@ export class WorkspaceService {
   readonly archiveRoot: string;
   /** Gitignored scratch space: upload staging and prompt candidates. */
   readonly tmpRoot: string;
+  /** Gitignored, rebuildable derived files such as the composition registry. */
+  readonly cacheRoot: string;
   readonly settings: Settings;
   readonly policy: PathPolicy;
   readonly #now: () => Date;
@@ -110,8 +123,9 @@ export class WorkspaceService {
       );
     }
     this.tmpRoot = path.join(repoRoot, ".motion-studio", "tmp");
+    this.cacheRoot = path.join(repoRoot, ".motion-studio", "cache");
     this.settings = settings;
-    this.policy = new PathPolicy([workspaceRoot, this.archiveRoot, this.tmpRoot]);
+    this.policy = new PathPolicy([workspaceRoot, this.archiveRoot, this.tmpRoot, this.cacheRoot]);
     this.#now = now ?? (() => new Date());
   }
 
@@ -305,7 +319,7 @@ export class WorkspaceService {
             "prompt.md": productionPromptTemplate(project.record, campaign.record, record),
             "notes.md": productionNotesTemplate(record),
             [`assets/${KEEP}`]: "",
-            [`src/${KEEP}`]: "",
+            "src/composition.tsx": productionCompositionTemplate(record),
             [`tests/${KEEP}`]: "",
             [`renders/manifests/${KEEP}`]: "",
             [`renders/final/${KEEP}`]: "",
@@ -379,6 +393,63 @@ export class WorkspaceService {
         path: current.path,
       };
     });
+  }
+
+  // ------------------------------------------------------- composition
+
+  /**
+   * Write the placeholder composition for a production that has no entry
+   * file yet (for example one created before previews existed). Never
+   * overwrites an existing entry.
+   */
+  async createPlaceholderComposition(id: string): Promise<{ path: string }> {
+    const { dir, record } = await this.locate("production", id);
+    const production = record as ProductionRecord;
+    const entry = this.policy.resolveRelative(dir, production.files.entry);
+    await mkdir(path.dirname(entry), { recursive: true });
+    try {
+      await writeFileExclusive(entry, productionCompositionTemplate(production));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+        throw new MotionStudioError("ALREADY_EXISTS", `${production.files.entry} already exists`);
+      }
+      throw error;
+    }
+    return { path: toRepoRelative(this.repoRoot, entry) };
+  }
+
+  /**
+   * Optional production input props from `props.json` (for example the QR
+   * destination URL). Preview and render both use these, overlaid on the
+   * composition's defaultProps.
+   */
+  async readProductionProps(id: string): Promise<ProductionProps> {
+    const { dir } = await this.locate("production", id);
+    const file = this.policy.resolve(dir, PROPS_FILE);
+    const relative = toRepoRelative(this.repoRoot, file);
+    let raw: string;
+    try {
+      raw = await readFile(file, "utf8");
+    } catch {
+      return { path: relative, exists: false, props: {} };
+    }
+    if (raw.length > MAX_PROPS_BYTES) {
+      return { path: relative, exists: true, props: {}, error: "props.json is larger than 256 KB" };
+    }
+    try {
+      const props: unknown = JSON.parse(raw);
+      if (!props || typeof props !== "object" || Array.isArray(props)) {
+        return {
+          path: relative,
+          exists: true,
+          props: {},
+          error: "props.json must contain a JSON object",
+        };
+      }
+      return { path: relative, exists: true, props: props as Record<string, unknown> };
+    } catch {
+      return { path: relative, exists: true, props: {}, error: "props.json is not valid JSON" };
+    }
   }
 
   // ------------------------------------------------------------------- files

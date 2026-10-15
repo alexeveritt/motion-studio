@@ -314,6 +314,57 @@ export class AssetLibrary {
     return { file, record };
   }
 
+  /**
+   * Resolve a composition's asset reference ("brand:logo.svg") for a
+   * production: the scope picks the folder in the production's chain and the
+   * name must be a registered asset there.
+   */
+  async openForProduction(
+    productionId: string,
+    assetScope: AssetScope,
+    storedName: string,
+  ): Promise<{ file: string; record: AssetRecord }> {
+    assertSafeSegment(storedName);
+    const catalog = await this.#workspace.scan();
+    for (const project of catalog.projects) {
+      for (const campaign of project.campaigns) {
+        if (!campaign.productions.some((production) => production.record.id === productionId))
+          continue;
+        const ownerId =
+          assetScope === "production"
+            ? productionId
+            : assetScope === "campaign"
+              ? campaign.record.id
+              : project.record.id;
+        const dir = await this.#folder(assetScope, ownerId);
+        const sidecar = this.#workspace.policy.resolve(dir, `${storedName}${SIDECAR_SUFFIX}`);
+        let record: AssetRecord;
+        try {
+          record = parseRecord(
+            assetRecordSchema,
+            JSON.parse(await readFile(sidecar, "utf8")),
+            "asset",
+          );
+        } catch {
+          throw new MotionStudioError(
+            "NOT_FOUND",
+            `No registered ${assetScope} asset named ${storedName}`,
+          );
+        }
+        if (record.storedName !== storedName)
+          throw new MotionStudioError(
+            "NOT_FOUND",
+            `No registered ${assetScope} asset named ${storedName}`,
+          );
+        const file = this.#workspace.policy.resolve(dir, storedName);
+        if (!(await exists(file)))
+          throw new MotionStudioError("NOT_FOUND", `${storedName} is missing`);
+        return { file, record };
+      }
+    }
+    throw new MotionStudioError("NOT_FOUND", "The production was not found");
+  }
+
   /** Validate every asset folder in the catalog. Used by `pnpm validate:workspace`. */
   async validate(catalog: Catalog): Promise<CatalogIssue[]> {
     const issues: CatalogIssue[] = [];

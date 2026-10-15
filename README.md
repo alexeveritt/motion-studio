@@ -4,7 +4,7 @@ A local-only workspace for organising, previewing and rendering code-driven moti
 
 The full build specification is in [`docs/SPEC.md`](docs/SPEC.md).
 
-> **Status: Milestone 2 (asset library and context packet).** Projects, campaigns and productions can be created, edited and archived; assets uploaded, inventoried and archived; and a Claude context packet generated for any production. Preview and rendering arrive in Milestones 3 and 4.
+> **Status: Milestone 3 (Remotion preview).** Projects, campaigns, productions, documents and assets are managed in the studio, a Claude context packet can be generated for any production, and every production previews in an embedded Remotion Player with exact frame control. Rendering arrives in Milestone 4.
 
 ## Requirements
 
@@ -45,7 +45,8 @@ Browser tests start their own studio on port 4331 using `.motion-studio/tmp/e2e/
 
 ```text
 apps/studio/          Astro management UI and local API routes (server-side filesystem access only)
-packages/core/        Zod schemas, path policy, atomic file store, workspace service, catalog scanner
+packages/core/        Zod schemas, path policy, atomic file store, workspace and asset services, registry, source check
+packages/motion-runtime/  Composition contract, useAsset, useLocalFont, SafeArea, seeded helpers
 workspace/projects/   Your creative work: projects, campaigns, productions
 workspace/archive/    Archived records (created on first archive)
 fixtures/workspace/   Sample records used by tests and `pnpm dev:fixtures`
@@ -75,6 +76,31 @@ Each project, brand, campaign and production has an `assets/` folder. Upload thr
 - SVGs containing script, event handlers, external references or entities are refused. Served SVGs are sandboxed.
 - An asset referenced by any production's `src/` or `tests/` cannot be archived. Archiving moves the file and sidecar to the archive folder.
 - Uploads are staged in `.motion-studio/tmp/uploads/` and limited by `maxUploadBytes` and `maxProjectBytes` in settings.
+
+## Compositions and preview
+
+Each production's entry file is `src/composition.tsx`. New productions get a placeholder that previews immediately; Claude Code replaces it. The entry exports:
+
+```tsx
+import type { MotionStudioComposition } from "@motion-studio/motion-runtime";
+
+export const composition: MotionStudioComposition<Props> = {
+  id: "<compositionId from production.json>",
+  Component: MyAdvert,
+  defaultProps: { headline: "…" },
+};
+```
+
+- Width, height, FPS and duration always come from `production.json`.
+- Assets are reached only through `useAsset("brand:logo.svg")` (scopes: `production`, `campaign`, `project`, `brand`), and fonts through `useLocalFont()`. Only registered assets resolve.
+- Optional `props.json` in the production folder is merged over `defaultProps` (for example a QR destination URL).
+- `packages/motion-runtime` also exports `SafeArea`, `seededRange` and `seededInt`.
+
+The studio generates a registry of compositions at `.motion-studio/cache/registry/<workspace>.ts` (gitignored) from the validated production records, on startup and whenever a production or entry file appears. Only productions listed there can be loaded; nothing is imported from a URL parameter.
+
+The **Preview** tab plays the composition with play/pause, exact frame entry, a scrubber, single-frame steps (buttons or ← →, Shift for one second, Home/End), poster-frame jump, loop, volume and Fit/50%/100% zoom. The paused frame is kept in the URL, so reloading after a source edit returns to it. Runtime errors appear in an overlay; load errors show TypeScript diagnostics with file and line, and **Check source** runs the same check on demand.
+
+Remotion is used under its own licence: some companies need a Remotion company licence (<https://remotion.dev/license>). The Player shows a console notice until `acknowledgeRemotionLicense` is set, which is left to the repository owner.
 
 ## Handing work to Claude Code
 
