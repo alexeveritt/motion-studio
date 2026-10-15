@@ -4,6 +4,7 @@ import {
   findRepoRoot,
   loadSettings,
   MotionStudioError,
+  resolveJobsRoot,
   resolveWorkspaceRoot,
   WorkspaceService,
 } from "@motion-studio/core";
@@ -26,7 +27,13 @@ export async function openWorkspace(workspaceOverride?: string) {
     settings,
     workspaceOverride ?? (process.env.MOTION_STUDIO_WORKSPACE || undefined),
   );
-  const workspace = new WorkspaceService({ repoRoot, workspaceRoot, settings });
+  const jobsRoot = resolveJobsRoot(repoRoot, process.env.MOTION_STUDIO_JOBS || undefined);
+  const workspace = new WorkspaceService({
+    repoRoot,
+    workspaceRoot,
+    settings,
+    ...(jobsRoot ? { jobsRoot } : {}),
+  });
   return { workspace, assets: new AssetLibrary(workspace) };
 }
 

@@ -9,10 +9,11 @@ import NotFound from "../../../../../../components/NotFound.astro";
 import ProductionForm from "../../../../../../components/ProductionForm.tsx";
 import ProductionPreview from "../../../../../../components/ProductionPreview.tsx";
 import PromptTools from "../../../../../../components/PromptTools.tsx";
+import RenderPanel from "../../../../../../components/RenderPanel.tsx";
 import Tabs from "../../../../../../components/Tabs.astro";
 import Base from "../../../../../../layouts/Base.astro";
 import { productionTone } from "../../../../../../lib/format.ts";
-import { refreshRegistry } from "../../../../../../lib/server/studio.ts";
+import { getRenders, refreshRegistry } from "../../../../../../lib/server/studio.ts";
 import {
   campaignUrl,
   findCampaign,
@@ -32,6 +33,7 @@ const production = findProduction(campaign, Astro.params.production);
 const TABS = [
   { id: "overview", label: "Overview" },
   { id: "preview", label: "Preview" },
+  { id: "render", label: "Render" },
   { id: "brief", label: "Brief" },
   { id: "prompt", label: "Prompt" },
   { id: "notes", label: "Notes" },
@@ -53,6 +55,11 @@ const productionAssets = id && tab === "assets" ? await assets.list("production"
 const registry = id && tab === "preview" ? await refreshRegistry() : undefined;
 const productionProps =
   id && tab === "preview" ? await workspace.readProductionProps(id) : undefined;
+const renders = id && tab === "render" ? await getRenders() : undefined;
+const renderHistory =
+  id && renders
+    ? { ...(await renders.history(id)), activeRenderId: renders.activeRenderId ?? null }
+    : undefined;
 const sections = brief ? sectionCompleteness(brief.content) : [];
 const filled = sections.filter((s) => s.filled).length;
 const profile = workspace.settings.renderProfiles.find(
@@ -130,8 +137,8 @@ const issues = catalog.issues.filter(
                 <code>{production.record.compositionId}</code>
               </p>
               <p class="muted">
-                Entry file <code>{production.record.files.entry}</code>. Rendering arrives in
-                Milestone 4. Use the Prompt tab to hand the work to Claude Code.
+                Entry file <code>{production.record.files.entry}</code>. Render it from the Render
+                tab. Use the Prompt tab to hand the work to Claude Code.
               </p>
             </div>
             <div>
@@ -206,6 +213,19 @@ const issues = catalog.issues.filter(
             or your trusted coding agent wrote or reviewed.
           </p>
         </>
+      )}
+      {tab === "render" && renderHistory && (
+        <RenderPanel
+          client:load
+          productionId={production.record.id}
+          productionPath={production.path}
+          profiles={profiles}
+          defaultProfileId={production.record.defaultRenderProfileId}
+          posterFrame={production.record.posterFrame}
+          fps={production.record.format.fps}
+          lastFrame={production.record.format.durationInFrames - 1}
+          initialHistory={renderHistory}
+        />
       )}
       {tab === "brief" && brief && (
         <MarkdownEditor

@@ -4,12 +4,21 @@ export class ApiError extends Error {
   readonly code: string;
   readonly status: number;
   readonly issues: FieldIssue[];
+  /** The full response body, for endpoints that return extra detail with an error. */
+  readonly body: Record<string, unknown>;
 
-  constructor(status: number, code: string, message: string, issues: FieldIssue[] = []) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    issues: FieldIssue[] = [],
+    body: Record<string, unknown> = {},
+  ) {
     super(message);
     this.status = status;
     this.code = code;
     this.issues = issues;
+    this.body = body;
   }
 }
 
@@ -36,7 +45,13 @@ export async function api<T>(
   };
   if (!response.ok) {
     const error = data.error ?? { code: "HTTP_" + response.status, message: response.statusText };
-    throw new ApiError(response.status, error.code, error.message, error.issues);
+    throw new ApiError(
+      response.status,
+      error.code,
+      error.message,
+      error.issues,
+      data as Record<string, unknown>,
+    );
   }
   return data as T;
 }

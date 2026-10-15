@@ -19,7 +19,9 @@
     "format:check": "prettier --check .",
     "validate:workspace": "node scripts/validate-workspace.ts",
     "test:e2e": "playwright test",
-    "context-packet": "node scripts/context-packet.ts"
+    "context-packet": "node scripts/context-packet.ts",
+    "render": "node scripts/render.ts",
+    "poster": "node scripts/poster.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -38,6 +40,8 @@
   },
   "dependencies": {
     "@motion-studio/motion-runtime": "workspace:*",
+    "@remotion/bundler": "4.0.535",
+    "@remotion/renderer": "4.0.535",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "remotion": "4.0.535"

@@ -75,3 +75,16 @@ export function isInside(root: string, candidate: string): boolean {
 export function toRepoRelative(repoRoot: string, absolutePath: string): string {
   return path.relative(repoRoot, absolutePath).split(path.sep).join("/");
 }
+
+/** Optional jobs-folder override (MOTION_STUDIO_JOBS), validated like the workspace override. */
+export function resolveJobsRoot(repoRoot: string, override?: string): string | undefined {
+  if (!override) return undefined;
+  const parsed = repoRelativePath.safeParse(override);
+  if (!parsed.success) {
+    throw new MotionStudioError(
+      "PATH_OUTSIDE_ROOT",
+      `Jobs folder "${override}" must be a repository-relative path`,
+    );
+  }
+  return path.resolve(repoRoot, parsed.data);
+}

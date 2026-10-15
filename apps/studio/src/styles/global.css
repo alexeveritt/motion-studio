@@ -819,3 +819,94 @@ pre.diff span[data-op="remove"] {
   font-size: 0.85rem;
   overflow-wrap: anywhere;
 }
+
+/* ------------------------------------------------------------ render */
+
+.render-panel {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.render-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.render-controls .field {
+  min-width: 160px;
+}
+
+.render-controls .poster-frame {
+  min-width: 0;
+  width: 8em;
+}
+
+.check-list,
+.output-list,
+.job-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-3) 0 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.check-list ul {
+  margin: var(--space-1) 0 0;
+  padding-left: var(--space-6);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.job-progress {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.job-progress progress {
+  flex: 1;
+  min-width: 200px;
+  height: 12px;
+  accent-color: var(--accent);
+}
+
+.job-log {
+  max-height: 280px;
+  overflow: auto;
+  background: var(--surface-muted);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.output-item {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: var(--space-4);
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-3);
+}
+
+.output-media video,
+.output-media img {
+  width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  background: #0d0e10;
+  border-radius: var(--radius);
+}
+
+.output-details {
+  display: grid;
+  gap: var(--space-1);
+  font-size: 0.9rem;
+  min-width: 0;
+}

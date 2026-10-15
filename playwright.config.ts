@@ -23,6 +23,10 @@ export default defineConfig({
     url: `http://127.0.0.1:${PORT}/`,
     reuseExistingServer: false,
     timeout: 60_000,
-    env: { MOTION_STUDIO_WORKSPACE: E2E_WORKSPACE, ASTRO_TELEMETRY_DISABLED: "1" },
+    env: {
+      MOTION_STUDIO_WORKSPACE: E2E_WORKSPACE,
+      MOTION_STUDIO_JOBS: ".motion-studio/tmp/e2e/jobs",
+      ASTRO_TELEMETRY_DISABLED: "1",
+    },
   },
 });

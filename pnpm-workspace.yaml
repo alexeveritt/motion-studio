@@ -1,3 +1,7 @@
 packages:
   - apps/*
   - packages/*
+# Build scripts are opt-in under pnpm 11. esbuild works from its platform
+# package without running its install script.
+allowBuilds:
+  esbuild: false

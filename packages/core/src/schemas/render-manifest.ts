@@ -41,3 +41,36 @@ export const renderManifestSchema = z.strictObject({
 });
 
 export type RenderManifest = z.infer<typeof renderManifestSchema>;
+
+/** Manifest for a standalone poster render (no video). */
+export const posterManifestSchema = z.strictObject({
+  schemaVersion,
+  renderId: z.string().min(1).max(100),
+  productionId: recordId,
+  compositionId: slug,
+  profileId,
+  requestedAt: timestamp,
+  startedAt: timestamp,
+  completedAt: timestamp,
+  status: z.literal("succeeded"),
+  inputFingerprint: sha256,
+  git: z.strictObject({ commit: z.string().optional(), dirty: z.boolean() }).optional(),
+  environment: z.strictObject({
+    node: z.string(),
+    pnpm: z.string(),
+    remotion: z.string(),
+    platform: z.string(),
+    architecture: z.string(),
+  }),
+  poster: z.strictObject({
+    relativePath,
+    frame: z.int().min(0),
+    sha256,
+    bytes: z.int().min(0),
+    width: z.int().positive(),
+    height: z.int().positive(),
+  }),
+  warnings: z.array(z.string()),
+});
+
+export type PosterManifest = z.infer<typeof posterManifestSchema>;

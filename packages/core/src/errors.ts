@@ -23,6 +23,14 @@ export type ErrorCode =
   | "ALREADY_EXISTS"
   | "CONFIRMATION_REQUIRED"
   | "IN_USE"
+  | "BUSY"
+  | "PREFLIGHT_FAILED"
+  | "RENDER_FAILED"
+  | "CANCELLED"
+  | "INPUTS_CHANGED"
+  | "VIDEO_VALIDATION_FAILED"
+  | "COMPOSITION_RUNTIME_ERROR"
+  | "TOOLING"
   | "UNSUPPORTED_MEDIA";
 
 export class MotionStudioError extends Error {

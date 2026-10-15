@@ -55,6 +55,8 @@ export type WorkspaceOptions = {
   settings: Settings;
   /** Injectable clock for tests. */
   now?: () => Date;
+  /** Render job folder; defaults to .motion-studio/jobs. Tests point this at a scratch folder. */
+  jobsRoot?: string;
 };
 
 export type DocumentContent = {
@@ -107,12 +109,14 @@ export class WorkspaceService {
   readonly tmpRoot: string;
   /** Gitignored, rebuildable derived files such as the composition registry. */
   readonly cacheRoot: string;
+  /** Gitignored, ephemeral render job state, logs and partial outputs. */
+  readonly jobsRoot: string;
   readonly settings: Settings;
   readonly policy: PathPolicy;
   readonly #now: () => Date;
   readonly #mutex = new KeyedMutex();
 
-  constructor({ repoRoot, workspaceRoot, settings, now }: WorkspaceOptions) {
+  constructor({ repoRoot, workspaceRoot, settings, now, jobsRoot }: WorkspaceOptions) {
     this.repoRoot = repoRoot;
     this.workspaceRoot = workspaceRoot;
     this.archiveRoot = path.join(path.dirname(workspaceRoot), "archive");
@@ -124,8 +128,21 @@ export class WorkspaceService {
     }
     this.tmpRoot = path.join(repoRoot, ".motion-studio", "tmp");
     this.cacheRoot = path.join(repoRoot, ".motion-studio", "cache");
+    this.jobsRoot = jobsRoot ?? path.join(repoRoot, ".motion-studio", "jobs");
+    if (!isInside(repoRoot, this.jobsRoot)) {
+      throw new MotionStudioError(
+        "PATH_OUTSIDE_ROOT",
+        "The jobs folder must be inside the repository",
+      );
+    }
     this.settings = settings;
-    this.policy = new PathPolicy([workspaceRoot, this.archiveRoot, this.tmpRoot, this.cacheRoot]);
+    this.policy = new PathPolicy([
+      workspaceRoot,
+      this.archiveRoot,
+      this.tmpRoot,
+      this.cacheRoot,
+      this.jobsRoot,
+    ]);
     this.#now = now ?? (() => new Date());
   }
 

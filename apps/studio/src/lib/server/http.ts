@@ -1,4 +1,9 @@
-import { MotionStudioError, SchemaValidationError, type ErrorCode } from "@motion-studio/core";
+import {
+  MotionStudioError,
+  PreflightFailedError,
+  SchemaValidationError,
+  type ErrorCode,
+} from "@motion-studio/core";
 import type { APIContext, APIRoute } from "astro";
 
 const MAX_JSON_BYTES = 1024 * 1024;
@@ -11,6 +16,9 @@ const STATUS: Partial<Record<ErrorCode, number>> = {
   REVISION_CONFLICT: 409,
   ALREADY_EXISTS: 409,
   IN_USE: 409,
+  BUSY: 409,
+  INPUTS_CHANGED: 409,
+  PREFLIGHT_FAILED: 422,
   LIMIT_EXCEEDED: 413,
   UNSUPPORTED_MEDIA: 415,
 };
@@ -29,9 +37,11 @@ export function errorResponse(error: unknown): Response {
   if (error instanceof MotionStudioError) {
     const status = error instanceof HttpError ? error.status : (STATUS[error.code] ?? 500);
     const issues = error instanceof SchemaValidationError ? error.issues : undefined;
+    // A failed preflight returns the full check list so the UI can show it.
+    const preflight = error instanceof PreflightFailedError ? error.result : undefined;
     if (status >= 500) console.error(error);
     return Response.json(
-      { error: { code: error.code, message: error.message, issues } },
+      { error: { code: error.code, message: error.message, issues }, preflight },
       { status },
     );
   }

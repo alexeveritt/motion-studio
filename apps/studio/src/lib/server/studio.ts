@@ -1,7 +1,9 @@
 import {
   AssetLibrary,
   findRepoRoot,
+  RenderController,
   loadSettings,
+  resolveJobsRoot,
   resolveWorkspaceRoot,
   WorkspaceService,
   writeRegistry,
@@ -26,7 +28,13 @@ export function getWorkspace(): Promise<WorkspaceService> {
       settings,
       process.env.MOTION_STUDIO_WORKSPACE || undefined,
     );
-    return new WorkspaceService({ repoRoot, workspaceRoot, settings });
+    const jobsRoot = resolveJobsRoot(repoRoot, process.env.MOTION_STUDIO_JOBS || undefined);
+    return new WorkspaceService({
+      repoRoot,
+      workspaceRoot,
+      settings,
+      ...(jobsRoot ? { jobsRoot } : {}),
+    });
   })();
   workspace.catch(() => {
     workspace = undefined;
@@ -56,4 +64,24 @@ export async function refreshRegistry(): Promise<RegistryResult> {
   const result = await writeRegistry(await getWorkspace());
   if (result.changed) invalidateRegistryModule(result.file);
   return result;
+}
+
+let renders: Promise<RenderController> | undefined;
+
+/**
+ * The studio's render controller. Created once; on creation it recovers jobs
+ * left running by a previous process (spec section 11.4).
+ */
+export function getRenders(): Promise<RenderController> {
+  renders ??= (async () => {
+    const controller = new RenderController(await getWorkspace(), await getAssets());
+    const recovered = await controller.recover();
+    if (recovered.length > 0)
+      console.warn(`Marked ${recovered.length} interrupted render(s) from an earlier run.`);
+    return controller;
+  })();
+  renders.catch(() => {
+    renders = undefined;
+  });
+  return renders;
 }

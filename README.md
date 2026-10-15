@@ -4,7 +4,7 @@ A local-only workspace for organising, previewing and rendering code-driven moti
 
 The full build specification is in [`docs/SPEC.md`](docs/SPEC.md).
 
-> **Status: Milestone 3 (Remotion preview).** Projects, campaigns, productions, documents and assets are managed in the studio, a Claude context packet can be generated for any production, and every production previews in an embedded Remotion Player with exact frame control. Rendering arrives in Milestone 4.
+> **Status: Milestone 4 (rendering and posters).** Projects, campaigns, productions, documents and assets are managed in the studio; productions preview with exact frame control; and named profiles render validated H.264 MP4s, posters and manifests. Milestone 5 (hardening and the CookGuide acceptance production) is next.
 
 ## Requirements
 
@@ -36,8 +36,6 @@ pnpm exec playwright install chromium   # once, for browser tests only
 | `pnpm -s context-packet -- <production-id>` | Print the Claude context packet for a production                       |
 
 `pnpm validate:workspace -- --workspace fixtures/workspace/projects` validates a different repository-relative workspace. The studio honours the same override through `MOTION_STUDIO_WORKSPACE`.
-
-Not yet implemented: `pnpm render` and `pnpm poster` (Milestone 4).
 
 Browser tests start their own studio on port 4331 using `.motion-studio/tmp/e2e/projects`, which is wiped at the start of each run.
 
@@ -101,6 +99,20 @@ The studio generates a registry of compositions at `.motion-studio/cache/registr
 The **Preview** tab plays the composition with play/pause, exact frame entry, a scrubber, single-frame steps (buttons or ← →, Shift for one second, Home/End), poster-frame jump, loop, volume and Fit/50%/100% zoom. The paused frame is kept in the URL, so reloading after a source edit returns to it. Runtime errors appear in an overlay; load errors show TypeScript diagnostics with file and line, and **Check source** runs the same check on demand.
 
 Remotion is used under its own licence: some companies need a Remotion company licence (<https://remotion.dev/license>). The Player shows a console notice until `acknowledgeRemotionLicense` is set, which is left to the repository owner.
+
+## Rendering
+
+Render from a production's **Render** tab or with `pnpm render`. Both use the same controller:
+
+1. **Preflight** checks the records, type-checks the composition, checks format limits, verifies every asset is present and matches its SHA-256 (and that audio and video can be probed), checks the poster frame, the profile, pinned Remotion versions, writable output folders and Git state, and computes the **input fingerprint** from the production format, profile, props, source files, shared runtime, asset hashes and lockfile. Failures block the render; warnings (such as uncommitted changes) are recorded.
+2. A worker process (`scripts/render-worker.ts`, spawned with an argument array, no shell and a minimal environment) bundles only this production, renders **sample frames** (start, quarters, end and poster) to catch runtime errors early, then renders the MP4 and the poster.
+3. The controller re-checks the fingerprint, probes the video with ffprobe (H.264, `yuv420p`, size, FPS, exact frame count, duration) and the poster, hashes both, moves them into `renders/final/` without overwriting anything, and writes the manifest to `renders/manifests/` last.
+
+Outputs follow `YYYYMMDD-HHmmss_<production>_<profile>_<fingerprint-8>.mp4`, `…-poster.png` and `….render.json`. Commit the manifests (and approved finals). Failed or cancelled renders never produce a manifest; their partial files are deleted and the log is kept in `.motion-studio/jobs/<render-id>/log.txt`.
+
+Only one render runs at a time on the machine (a lock in `.motion-studio/jobs/`), whether started from the studio or the CLI; a second request gets a "busy" error. Cancel sends SIGTERM, then SIGKILL after five seconds. Renders are limited by `renderTimeoutSeconds`. If Motion Studio stops mid-render, the job is marked interrupted on the next start and its partial files removed; completed renders are never deleted.
+
+The first render downloads Remotion's pinned headless Chrome (cached afterwards). Rendering runs with `TZ=UTC`.
 
 ## Handing work to Claude Code
 

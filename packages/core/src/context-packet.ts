@@ -173,6 +173,8 @@ ${sourceFiles.length > 0 ? sourceFiles.map((file) => `- \`${file}\``).join("\n")
 pnpm check                 # type checks and framework checks
 pnpm test                  # unit and integration tests
 pnpm validate:workspace    # validate every record, sidecar and asset hash
+pnpm render -- ${record.id} --profile draft     # quick render; standard or high-quality for approval
+pnpm poster -- ${record.id} --frame ${record.posterFrame}   # render one poster frame
 pnpm -s context-packet -- ${record.id}   # print this packet again
 \`\`\`
 
