@@ -6,6 +6,7 @@
  *   pnpm validate:workspace
  *   pnpm validate:workspace -- --workspace fixtures/workspace/projects
  */
+import { propsStatus } from "@motion-studio/core";
 import { openWorkspace, parseCliArgs, runCli } from "./lib/cli.ts";
 
 await runCli(async () => {
@@ -13,6 +14,24 @@ await runCli(async () => {
   const { workspace, assets } = await openWorkspace(values.workspace);
   const catalog = await workspace.scan();
   const issues = [...catalog.issues, ...(await assets.validate(catalog))];
+
+  // props.json against props.schema.json, the same rule preflight applies.
+  for (const production of catalog.projects.flatMap((p) =>
+    p.campaigns.flatMap((c) => c.productions),
+  )) {
+    const [status, messages] = propsStatus(
+      await workspace.checkProductionProps(production.record.id),
+    );
+    if (status === "pass") continue;
+    for (const message of messages) {
+      issues.push({
+        severity: status === "fail" ? "error" : "warning",
+        code: "SCHEMA_INVALID",
+        path: `${production.path}/props.json`,
+        message,
+      });
+    }
+  }
 
   const campaigns = catalog.projects.flatMap((p) => p.campaigns);
   const productions = campaigns.flatMap((c) => c.productions);

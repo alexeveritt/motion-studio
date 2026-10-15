@@ -5,7 +5,11 @@ import { checkProductionSource, formatDiagnostic } from "../compile-check.ts";
 import { MotionStudioError } from "../errors.ts";
 import type { ProductionRecord } from "../schemas/production.ts";
 import type { RenderProfile } from "../schemas/render-profile.ts";
-import { formatLimitIssues, type WorkspaceService } from "../workspace.ts";
+import {
+  formatLimitIssues,
+  type ProductionPropsCheck,
+  type WorkspaceService,
+} from "../workspace.ts";
 import { pinnedVersions, remotionVersions } from "./environment.ts";
 import { assetChain, computeFingerprint, gatherFingerprintInputs } from "./fingerprint.ts";
 import { gitState, type GitState } from "./git.ts";
@@ -13,6 +17,29 @@ import { outputSize } from "./options.ts";
 import { canProbe } from "./probe.ts";
 
 export type CheckStatus = "pass" | "warn" | "fail";
+
+/** Status and messages for the props check; shared with workspace validation. */
+export function propsStatus(check: ProductionPropsCheck): [CheckStatus, string[]] {
+  const { props, schema, propsIssues } = check;
+  if (props.error) return ["fail", [`${props.path}: ${props.error}`]];
+  if (schema.exists && !schema.schema) {
+    return [
+      "fail",
+      schema.issues.map(
+        (issue) => `${schema.path}${issue.path ? ` ${issue.path}` : ""}: ${issue.message}`,
+      ),
+    ];
+  }
+  if (schema.schema) {
+    if (propsIssues.length > 0)
+      return ["fail", propsIssues.map((issue) => `${issue.path}: ${issue.message}`)];
+    const count = Object.keys(schema.schema.properties).length;
+    return ["pass", [`${count} prop${count === 1 ? "" : "s"} defined; props.json is valid`]];
+  }
+  return Object.keys(props.props).length > 0
+    ? ["warn", [`No ${schema.path.split("/").pop()}; props are not validated before rendering`]]
+    : ["pass", ["No props"]];
+}
 
 export type PreflightCheck = { id: string; label: string; status: CheckStatus; messages: string[] };
 
@@ -135,14 +162,17 @@ export async function runPreflight(
     for (const file of listing.unregistered)
       assetWarnings.push(`${file.path} has no sidecar and cannot be used`);
   }
-  const props = await workspace.readProductionProps(productionId);
-  if (props.error) assetMessages.push(`${props.path}: ${props.error}`);
   add(
     "assets",
     "Assets present, unchanged and readable",
     assetMessages.length ? "fail" : assetWarnings.length ? "warn" : "pass",
     [...assetMessages, ...assetWarnings],
   );
+
+  // Props: props.json against props.schema.json.
+  const propsCheck = await workspace.checkProductionProps(productionId);
+  const props = propsCheck.props;
+  add("props", "Props match the production's schema", ...propsStatus(propsCheck));
 
   // 5. Poster frame
   const lastFrame = production.format.durationInFrames - 1;

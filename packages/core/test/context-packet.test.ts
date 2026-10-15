@@ -67,6 +67,7 @@ describe("buildContextPacket", () => {
       "## Repository",
       "## Composition contract",
       "## Production",
+      "## Props",
       "## Render profile: Standard",
       "## Project: CookGuide",
       "## Campaign: QR Awareness",

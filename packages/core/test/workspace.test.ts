@@ -84,6 +84,7 @@ describe("creation", () => {
       "cookguide/campaigns/qr-awareness/productions/cookguide-qr-code-advert/notes.md",
       "cookguide/campaigns/qr-awareness/productions/cookguide-qr-code-advert/production.json",
       "cookguide/campaigns/qr-awareness/productions/cookguide-qr-code-advert/prompt.md",
+      "cookguide/campaigns/qr-awareness/productions/cookguide-qr-code-advert/props.schema.json",
       "cookguide/campaigns/qr-awareness/productions/cookguide-qr-code-advert/renders/final/.gitkeep",
       "cookguide/campaigns/qr-awareness/productions/cookguide-qr-code-advert/renders/manifests/.gitkeep",
       "cookguide/campaigns/qr-awareness/productions/cookguide-qr-code-advert/src/composition.tsx",
@@ -453,9 +454,14 @@ describe("listFiles", () => {
     const prefix =
       "workspace/projects/cookguide/campaigns/qr-awareness/productions/cookguide-qr-code-advert/";
     expect(await service.listFiles("production", production.id)).toEqual(
-      ["brief.md", "notes.md", "production.json", "prompt.md", "src/composition.tsx"].map(
-        (f) => prefix + f,
-      ),
+      [
+        "brief.md",
+        "notes.md",
+        "production.json",
+        "prompt.md",
+        "props.schema.json",
+        "src/composition.tsx",
+      ].map((f) => prefix + f),
     );
   });
 
@@ -475,11 +481,11 @@ describe("props.json document", () => {
     const current = await service.readDocument("production", production.id, "props");
     expect(current).toMatchObject({ exists: false, content: "" });
     const saved = await service.saveDocument("production", production.id, "props", {
-      content: '{ "qrUrl": "https://cookguide.example/start" }\n',
+      content: '{ "headline": "Cook tonight" }\n',
       baseHash: current.hash,
     });
     expect((await service.readProductionProps(production.id)).props).toEqual({
-      qrUrl: "https://cookguide.example/start",
+      headline: "Cook tonight",
     });
     for (const content of ["[1]", "{ nope", '"text"']) {
       await expect(
@@ -489,5 +495,71 @@ describe("props.json document", () => {
         }),
       ).rejects.toMatchObject({ code: "INVALID_INPUT" });
     }
+  });
+});
+
+describe("props schema", () => {
+  it("scaffolds a schema that matches the placeholder and accepts its props", async () => {
+    const { production } = await createHierarchy();
+    const check = await service.checkProductionProps(production.id);
+    expect(check.schema).toMatchObject({ exists: true, issues: [] });
+    expect(Object.keys(check.schema.schema!.properties)).toEqual(["headline"]);
+    expect(check.propsIssues).toEqual([]);
+  });
+
+  it("refuses to save props that break a valid schema, with field issues", async () => {
+    const { production } = await createHierarchy();
+    const dir = path.join(
+      workspaceRoot,
+      "cookguide/campaigns/qr-awareness/productions/cookguide-qr-code-advert",
+    );
+    await writeFile(
+      path.join(dir, "props.schema.json"),
+      JSON.stringify({
+        type: "object",
+        required: ["qrUrl"],
+        properties: { qrUrl: { type: "string", format: "uri", pattern: "^https://" } },
+      }),
+    );
+    const current = await service.readDocument("production", production.id, "props");
+    await expect(
+      service.saveDocument("production", production.id, "props", {
+        content: '{ "qrUrl": "http://x.example" }',
+        baseHash: current.hash,
+      }),
+    ).rejects.toMatchObject({
+      code: "INVALID_INPUT",
+      issues: [{ path: "qrUrl", message: "Must start with https://" }],
+    });
+    await expect(
+      service.saveDocument("production", production.id, "props", {
+        content: "{}",
+        baseHash: current.hash,
+      }),
+    ).rejects.toMatchObject({ issues: [{ path: "qrUrl", message: "Required" }] });
+    await service.saveDocument("production", production.id, "props", {
+      content: '{ "qrUrl": "https://x.example" }',
+      baseHash: current.hash,
+    });
+  });
+
+  it("still saves props when the schema itself is broken, and reports the schema", async () => {
+    const { production } = await createHierarchy();
+    const dir = path.join(
+      workspaceRoot,
+      "cookguide/campaigns/qr-awareness/productions/cookguide-qr-code-advert",
+    );
+    await writeFile(
+      path.join(dir, "props.schema.json"),
+      '{ "type": "object", "properties": { "x": { "type": "array" } } }',
+    );
+    const current = await service.readDocument("production", production.id, "props");
+    await service.saveDocument("production", production.id, "props", {
+      content: '{ "x": 1 }',
+      baseHash: current.hash,
+    });
+    const check = await service.checkProductionProps(production.id);
+    expect(check.schema.schema).toBeUndefined();
+    expect(check.schema.issues.length).toBeGreaterThan(0);
   });
 });

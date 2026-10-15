@@ -9,6 +9,7 @@ import NotFound from "../../../../../../components/NotFound.astro";
 import ProductionForm from "../../../../../../components/ProductionForm.tsx";
 import ProductionPreview from "../../../../../../components/ProductionPreview.tsx";
 import PromptTools from "../../../../../../components/PromptTools.tsx";
+import PropsForm from "../../../../../../components/PropsForm.tsx";
 import RenderPanel from "../../../../../../components/RenderPanel.tsx";
 import Tabs from "../../../../../../components/Tabs.astro";
 import Base from "../../../../../../layouts/Base.astro";
@@ -51,6 +52,7 @@ const documentTab =
     ? await workspace.readDocument("production", id, tab)
     : undefined;
 const files = id && tab === "files" ? await workspace.listFiles("production", id) : [];
+const propsSchema = id && tab === "props" ? await workspace.readPropsSchema(id) : undefined;
 const productionAssets = id && tab === "assets" ? await assets.list("production", id) : undefined;
 // Pick up entry files created since startup (for example by Claude Code).
 const registry = id && tab === "preview" ? await refreshRegistry() : undefined;
@@ -272,22 +274,61 @@ const issues = catalog.issues.filter(
           maxUploadBytes={maxUploadBytes}
         />
       )}
-      {tab === "props" && documentTab && (
+      {tab === "props" && documentTab && propsSchema && (
         <>
           <p class="muted">
             Input props for preview and render, merged over the composition's{" "}
             <code>defaultProps</code>. Put production-specific values here (destination URLs, dates,
             copy variants), never in the source.
           </p>
-          <MarkdownEditor
-            client:load
-            scope="production"
-            id={production.record.id}
-            kind="props"
-            label="Props"
-            language="json"
-            initial={documentTab.exists ? documentTab : { ...documentTab, content: "{}\n" }}
-          />
+          {propsSchema.schema ? (
+            <PropsForm
+              client:load
+              productionId={production.record.id}
+              schema={propsSchema.schema}
+              schemaPath={propsSchema.path}
+              initial={documentTab}
+            />
+          ) : propsSchema.exists ? (
+            <section class="panel" role="alert">
+              <h2>The props schema is invalid</h2>
+              <p>
+                <code>{propsSchema.path}</code> has problems, so props cannot be checked and
+                rendering is blocked until it is fixed. Ask Claude Code to correct it, or edit the
+                file.
+              </p>
+              <ul>
+                {propsSchema.issues.map((issue) => (
+                  <li>
+                    {issue.path && <code>{issue.path}</code>} {issue.message}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : (
+            <section class="panel">
+              <h2>No props schema</h2>
+              <p class="muted">
+                This production has no <code>props.schema.json</code>, so its props are free-form
+                and are not checked before rendering. Ask Claude Code to add one alongside the
+                composition.
+              </p>
+            </section>
+          )}
+          <details class="panel advanced-props" open={!propsSchema.schema}>
+            <summary>
+              {propsSchema.schema ? "Advanced: edit props.json directly" : "Edit props.json"}
+            </summary>
+            <MarkdownEditor
+              client:load
+              scope="production"
+              id={production.record.id}
+              kind="props"
+              label="Props"
+              language="json"
+              initial={documentTab.exists ? documentTab : { ...documentTab, content: "{}\n" }}
+            />
+          </details>
         </>
       )}
       {tab === "files" && (

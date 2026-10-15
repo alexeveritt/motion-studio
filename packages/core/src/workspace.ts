@@ -40,8 +40,15 @@ import { projectRecordSchema, type ProjectRecord } from "./schemas/project.ts";
 import type { Settings } from "./schemas/settings.ts";
 import { SLUG_MAX_LENGTH, slugify } from "./slug.ts";
 import {
+  parsePropsSchema,
+  PROPS_SCHEMA_FILE,
+  validateProps,
+  type PropsSchema,
+} from "./props-schema.ts";
+import {
   brandTemplate,
   productionCompositionTemplate,
+  productionPropsSchemaTemplate,
   campaignBriefTemplate,
   productionBriefTemplate,
   productionNotesTemplate,
@@ -82,6 +89,23 @@ const RECORD_SCHEMAS = {
 const KEEP = ".gitkeep";
 const PROPS_FILE = "props.json";
 const MAX_PROPS_BYTES = 256 * 1024;
+
+export type PropsSchemaFile = {
+  /** Repository-relative path of props.schema.json. */
+  path: string;
+  exists: boolean;
+  raw?: string;
+  schema?: PropsSchema;
+  /** Problems with the schema itself. */
+  issues: FieldIssue[];
+};
+
+export type ProductionPropsCheck = {
+  props: ProductionProps;
+  schema: PropsSchemaFile;
+  /** Props that do not satisfy a valid schema, keyed by property name. */
+  propsIssues: FieldIssue[];
+};
 
 export type ProductionProps = {
   /** Repository-relative path of props.json. */
@@ -337,6 +361,7 @@ export class WorkspaceService {
             "notes.md": productionNotesTemplate(record),
             [`assets/${KEEP}`]: "",
             "src/composition.tsx": productionCompositionTemplate(record),
+            [PROPS_SCHEMA_FILE]: productionPropsSchemaTemplate(record),
             [`tests/${KEEP}`]: "",
             [`renders/manifests/${KEEP}`]: "",
             [`renders/final/${KEEP}`]: "",
@@ -391,7 +416,14 @@ export class WorkspaceService {
     rawInput: unknown,
   ): Promise<DocumentContent> {
     const input = parseInput(documentSaveInputSchema, rawInput, "document");
-    if (scopeName === "production" && kind === "props") assertPropsJson(input.content);
+    if (scopeName === "production" && kind === "props") {
+      const props = assertPropsJson(input.content);
+      // Enforce the production's schema when it has a valid one. An invalid
+      // schema does not block saving; preflight reports it instead.
+      const { schema } = await this.readPropsSchema(id);
+      const issues = schema ? validateProps(schema, props) : [];
+      if (issues.length > 0) throw new SchemaValidationError("props", issues, "INVALID_INPUT");
+    }
     const file = await this.#documentFile(scopeName, id, kind);
     return this.#mutex.run(file, async () => {
       const current = await this.readDocument(scopeName, id, kind);
@@ -468,6 +500,38 @@ export class WorkspaceService {
     } catch {
       return { path: relative, exists: true, props: {}, error: "props.json is not valid JSON" };
     }
+  }
+
+  /** The production's optional `props.schema.json`, parsed. Never throws for a bad schema. */
+  async readPropsSchema(id: string): Promise<PropsSchemaFile> {
+    const { dir } = await this.locate("production", id);
+    const file = this.policy.resolve(dir, PROPS_SCHEMA_FILE);
+    const relative = toRepoRelative(this.repoRoot, file);
+    let raw: string;
+    try {
+      raw = await readFile(file, "utf8");
+    } catch {
+      return { path: relative, exists: false, issues: [] };
+    }
+    const parsed = parsePropsSchema(raw);
+    return {
+      path: relative,
+      exists: true,
+      raw,
+      ...(parsed.schema ? { schema: parsed.schema } : {}),
+      issues: parsed.issues,
+    };
+  }
+
+  /** Props and schema together, with every problem found. Used by preflight, validation and the studio. */
+  async checkProductionProps(id: string): Promise<ProductionPropsCheck> {
+    const [props, schema] = await Promise.all([
+      this.readProductionProps(id),
+      this.readPropsSchema(id),
+    ]);
+    const propsIssues =
+      schema.schema && !props.error ? validateProps(schema.schema, props.props) : [];
+    return { props, schema, propsIssues };
   }
 
   // ------------------------------------------------------------------- files
@@ -711,7 +775,7 @@ export class WorkspaceService {
 }
 
 /** props.json must be a JSON object within the size limit; anything else is refused on save. */
-function assertPropsJson(content: string): void {
+function assertPropsJson(content: string): Record<string, unknown> {
   const fail = (message: string) => {
     throw new SchemaValidationError("props.json", [{ path: "content", message }], "INVALID_INPUT");
   };
@@ -722,8 +786,10 @@ function assertPropsJson(content: string): void {
   } catch (error) {
     fail(`Not valid JSON: ${error instanceof Error ? error.message : "parse error"}`);
   }
-  if (!value || typeof value !== "object" || Array.isArray(value))
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
     fail("props.json must contain a JSON object");
+  }
+  return value as Record<string, unknown>;
 }
 
 export function formatLimitIssues(format: ProductionFormat, settings: Settings): FieldIssue[] {

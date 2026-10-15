@@ -143,6 +143,7 @@ type Props = { headline: string };
  * Placeholder created by Motion Studio. Replace it with the composition
  * described in ../brief.md. Derive everything from the current frame and
  * props; load fonts and images from assets with useAsset() and useLocalFont().
+ * Keep ../props.schema.json in step with the Props type below.
  */
 function Placeholder({ headline }: Props) {
   const frame = useCurrentFrame();
@@ -195,4 +196,29 @@ export const composition: MotionStudioComposition<Props> = {
   defaultProps: { headline: ${JSON.stringify(production.title)} },
 };
 `;
+}
+
+/** Props schema matching the placeholder composition's single `headline` prop. */
+export function productionPropsSchemaTemplate(production: ProductionRecord): string {
+  return `${JSON.stringify(
+    {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      title: `${production.title} props`,
+      type: "object",
+      additionalProperties: false,
+      required: [],
+      properties: {
+        headline: {
+          type: "string",
+          title: "Headline",
+          description:
+            "Shown by the placeholder composition. Replace this schema when the real composition is written.",
+          maxLength: 120,
+          default: production.title,
+        },
+      },
+    },
+    null,
+    2,
+  )}\n`;
 }

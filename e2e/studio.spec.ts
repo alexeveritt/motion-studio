@@ -208,31 +208,3 @@ async function editDocument(page: Page, tab: "brief" | "prompt", find: string, r
   await editor.press("ControlOrMeta+s");
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
 }
-
-test("edits props.json with JSON validation", async ({ page }) => {
-  await goto(page, `${PRODUCTION_URL}?tab=props`);
-  const editor = page.getByLabel("Props Markdown", { exact: true });
-  await expect(editor).toHaveValue("{}\n");
-  const save = page.getByRole("button", { name: "Save", exact: true });
-
-  await editor.fill('{ "qrUrl": ');
-  await expect(page.getByLabel("Props preview").getByRole("alert")).toContainText("Not valid JSON");
-  await expect(save).toBeDisabled();
-
-  await editor.fill('["not", "an", "object"]');
-  await expect(page.getByLabel("Props preview").getByRole("alert")).toContainText(
-    "Must be a JSON object",
-  );
-
-  await editor.fill('{ "qrUrl": "https://cookguide.example/start" }\n');
-  await expect(page.getByText("valid JSON object")).toBeVisible();
-  await save.click();
-  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
-  const file = path.join(
-    productionDir("cookguide", "qr-awareness", "cookguide-qr-code-advert"),
-    "props.json",
-  );
-  expect(JSON.parse(await readFile(file, "utf8"))).toEqual({
-    qrUrl: "https://cookguide.example/start",
-  });
-});

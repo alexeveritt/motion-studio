@@ -51,6 +51,7 @@ export async function buildContextPacket(
   const doc = async (scope: "project" | "production", id: string, kind: string) =>
     (await workspace.readDocument(scope, id, kind)).content.trim();
 
+  const propsCheck = await workspace.checkProductionProps(record.id);
   const [prompt, brief, context, brand] = await Promise.all([
     doc("production", record.id, "prompt"),
     doc("production", record.id, "brief"),
@@ -136,6 +137,15 @@ Determinism rules:
 | Production ID | \`${record.id}\` |
 ${studioLink ? `| Studio page | ${studioLink} |\n` : ""}
 ${record.description ? `${record.description}\n` : ""}`,
+
+    `## Props
+
+Values for this production live in \`props.json\` and are merged over the composition's \`defaultProps\`. Their shape is declared in \`props.schema.json\` (a small subset of JSON Schema: string, number, integer and boolean fields with title, description, default, enum, format uri/date/color, pattern, min/max). Preflight refuses to render when the props do not match it, and the studio's Props tab is generated from it. **When you add, rename or remove a prop in the composition, update \`props.schema.json\` to match.**
+
+${propsCheck.schema.raw ? `Current \`props.schema.json\`:\n\n${fence(propsCheck.schema.raw.trim(), "json")}` : "This production has no `props.schema.json` yet; create one alongside the composition's Props type."}
+
+${propsCheck.props.exists ? `Current \`props.json\`:\n\n${fence(JSON.stringify(propsCheck.props.props, null, 2), "json")}` : "No `props.json` yet; the composition's defaults apply."}
+${[...propsCheck.schema.issues.map((i) => `- Schema problem: ${i.path || "(root)"}: ${i.message}`), ...propsCheck.propsIssues.map((i) => `- Props problem: ${i.path}: ${i.message}`)].join("\n")}`,
 
     `## Render profile: ${profile?.name ?? record.defaultRenderProfileId}
 

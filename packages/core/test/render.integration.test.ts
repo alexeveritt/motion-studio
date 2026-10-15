@@ -97,6 +97,15 @@ export const composition: MotionStudioComposition<{ label: string }> = {
 };
 `,
   );
+  // The composition's props, declared as the composition author must.
+  await writeFile(
+    path.join(dir, "props.schema.json"),
+    JSON.stringify({
+      type: "object",
+      required: [],
+      properties: { label: { type: "string", maxLength: 40 } },
+    }),
+  );
   await writeFile(path.join(dir, "props.json"), JSON.stringify({ label: "props" }));
 }, TIMEOUT);
 
@@ -266,6 +275,30 @@ describe("golden frames", () => {
 });
 
 describe("failures", () => {
+  it(
+    "blocks a render when props break the schema",
+    async () => {
+      const propsFile = path.join(dir, "props.json");
+      const original = await readFile(propsFile, "utf8");
+      await writeFile(propsFile, JSON.stringify({ label: 42 }));
+      try {
+        const error = await controller
+          .start({ productionId: production.id, profileId: "standard" })
+          .catch((e: unknown) => e);
+        expect(error).toBeInstanceOf(PreflightFailedError);
+        expect(
+          (error as PreflightFailedError).result.checks.find((c) => c.id === "props"),
+        ).toMatchObject({
+          status: "fail",
+          messages: ["label: Must be text"],
+        });
+      } finally {
+        await writeFile(propsFile, original);
+      }
+    },
+    TIMEOUT,
+  );
+
   it(
     "blocks a render when a registered asset is missing",
     async () => {

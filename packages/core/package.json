@@ -9,7 +9,8 @@
     "./slug": "./src/slug.ts",
     "./time": "./src/time.ts",
     "./diff": "./src/diff.ts",
-    "./media": "./src/media.ts"
+    "./media": "./src/media.ts",
+    "./props-schema": "./src/props-schema.ts"
   },
   "scripts": {
     "check": "tsc -p tsconfig.json"

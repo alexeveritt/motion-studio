@@ -34,7 +34,7 @@ If Astro detects an AI coding agent it starts the dev server in the background; 
 3. **Production** (campaign page → New production): title, size, FPS, duration in frames and poster frame. New productions get a placeholder composition and preview straight away.
 4. **Brief**: fill in every section. The header shows how many are complete.
 5. **Assets**: upload production-specific files, or copy them into the folder and press **Register**. Add alt text, source and licence notes.
-6. **Props**: production-specific values such as a QR destination URL go in `props.json` on the **Props** tab, never in source code.
+6. **Props**: production-specific values such as a QR destination URL go on the **Props** tab, never in source code. The form is generated from the production's `props.schema.json` and checks each value as you save; preflight refuses to render with invalid props.
 7. **Hand off to Claude Code**: on the **Prompt** tab, edit the request and press **Copy context packet**. Paste both into Claude Code. Claude works only inside the production folder and never commits.
 8. **Preview**: scrub, step frame by frame (← →), jump to the poster frame. Errors show in the player; **Check source** lists type errors with file and line.
 9. **Render**: **Run preflight**, then **Render MP4 and poster** with the `standard` profile (`draft` for quick checks, `high-quality` for masters).
@@ -112,6 +112,8 @@ The repository is the backup unit.
 | "Workspace unavailable" on the dashboard                                 | `.motion-studio/settings.json` is invalid or the workspace path escapes the repository; the message names the problem.                                                                                                                    |
 | Preflight fails "Composition source type-checks"                         | Open the Preview tab and press **Check source** for file:line errors, or run `pnpm check`.                                                                                                                                                |
 | Preflight fails "Assets present, unchanged and readable"                 | See _Asset shows modified or missing_ above. Files without sidecars are warnings; register them.                                                                                                                                          |
+| Preflight fails "Props match the production's schema"                    | A prop is missing or invalid (the message names it), or `props.schema.json` itself is broken. Fix the value on the **Props** tab; ask Claude Code to fix a broken schema.                                                                 |
+| Props tab says "No props schema"                                         | Older productions have none. Ask Claude Code to add `props.schema.json` matching the composition's props.                                                                                                                                 |
 | Render fails "The composition threw at frame N"                          | A runtime error in the composition. Preview that frame to see the overlay and stack. Missing props (for example `props.qrUrl is missing`) show up here.                                                                                   |
 | Render fails "Output check failed"                                       | The encoded video did not match the configuration (size, FPS, frame count). Check the profile scale gives even dimensions and the composition does not override its size.                                                                 |
 | Render fails "Source, assets, props or settings changed while rendering" | Something edited the inputs mid-render. Render again once edits are finished.                                                                                                                                                             |
@@ -137,14 +139,14 @@ The repository is the backup unit.
 - Audio and video durations are not recorded in asset sidecars (they are probed at preflight).
 - Asset usage is detected by searching source for stored file names; names built at runtime are not detected.
 - Each asset listing re-hashes the folder, so very large video folders make the Assets tab slower.
-- `props.json` is free-form JSON; compositions validate their own props (as CookGuide does with `assertHttpsUrl`).
+- Props are flat: `props.schema.json` has no nested objects or arrays yet.
 - Golden frames compare at the `standard` profile and may need a fresh baseline after upgrading Remotion or Chrome.
 - Locating ffprobe uses Remotion's internal `RenderInternals` API, kept stable by the exact Remotion pin.
 - The CookGuide production uses placeholder artwork and the non-resolving placeholder URL `https://cookguide.example/start` until the owner supplies approved ones.
 
 ## 10. Suggested version-two work
 
-- A props schema per production (validated in preflight and edited with a form).
+- Nested objects and lists in the props schema (for example a list of recipe steps).
 - Thumbnail generation and probed media durations for assets.
 - A render queue instead of "busy", and render presets per channel (for example 1080 × 1350 cut-downs).
 - A diff view for golden-frame failures in the studio.

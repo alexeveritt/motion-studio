@@ -27,3 +27,4 @@ export * from "./render/preflight.ts";
 export * from "./render/request.ts";
 export * from "./render/controller.ts";
 export * from "./golden.ts";
+export * from "./props-schema.ts";

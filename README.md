@@ -91,7 +91,7 @@ export const composition: MotionStudioComposition<Props> = {
 
 - Width, height, FPS and duration always come from `production.json`.
 - Assets are reached only through `useAsset("brand:logo.svg")` (scopes: `production`, `campaign`, `project`, `brand`), and fonts through `useLocalFont()`. Only registered assets resolve.
-- Optional `props.json` in the production folder is merged over `defaultProps` (for example a QR destination URL).
+- Optional `props.json` in the production folder is merged over `defaultProps` (for example a QR destination URL). Its shape is declared in `props.schema.json`; see [Props](#props).
 - `packages/motion-runtime` also exports `SafeArea`, `seededRange` and `seededInt`.
 
 The studio generates a registry of compositions at `.motion-studio/cache/registry/<workspace>.ts` (gitignored) from the validated production records, on startup and whenever a production or entry file appears. Only productions listed there can be loaded; nothing is imported from a URL parameter.
@@ -113,6 +113,36 @@ Outputs follow `YYYYMMDD-HHmmss_<production>_<profile>_<fingerprint-8>.mp4`, `â€
 Only one render runs at a time on the machine (a lock in `.motion-studio/jobs/`), whether started from the studio or the CLI; a second request gets a "busy" error. Cancel sends SIGTERM, then SIGKILL after five seconds. Renders are limited by `renderTimeoutSeconds`. If Motion Studio stops mid-render, the job is marked interrupted on the next start and its partial files removed; completed renders are never deleted.
 
 The first render downloads Remotion's pinned headless Chrome (cached afterwards). Rendering runs with `TZ=UTC`.
+
+## Props
+
+Production-specific values (destination URLs, dates, copy variants) live in `props.json`, never in source. Each production declares their shape in `props.schema.json`, a small, strict subset of JSON Schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["qrUrl"],
+  "properties": {
+    "qrUrl": {
+      "type": "string",
+      "title": "QR destination",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "variant": { "type": "string", "enum": ["warm", "fresh"], "default": "warm" },
+    "loops": { "type": "integer", "minimum": 1, "maximum": 3 },
+    "showSafeArea": { "type": "boolean", "default": false }
+  }
+}
+```
+
+Supported: `string`, `number`, `integer` and `boolean` fields with `title`, `description`, `default`, `enum`, `format` (`uri`, `date`, `color`), `pattern`, `minLength`, `maxLength`, `minimum` and `maximum`, plus top-level `required`. Anything else makes the schema invalid, and props the schema does not define are rejected, so a typo cannot quietly switch checking off.
+
+- The **Props** tab is generated from the schema: one field per prop, validated as you save. The raw JSON editor stays available under _Advanced_.
+- Saving props that break a valid schema is refused, from the form or the API.
+- **Preflight** fails the render when the schema is invalid or the props do not match it, and `pnpm validate:workspace` reports the same problems.
+- New productions are scaffolded with a schema matching the placeholder. The context packet includes the schema and tells Claude Code to keep it in step with the composition.
 
 ## Handing work to Claude Code
 

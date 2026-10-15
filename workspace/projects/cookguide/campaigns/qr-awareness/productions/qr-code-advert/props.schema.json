@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CookGuide QR advert props",
+  "description": "Values the advert needs that must not be hard-coded in the composition.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["qrUrl"],
+  "properties": {
+    "qrUrl": {
+      "type": "string",
+      "title": "QR destination",
+      "description": "Where the QR code sends viewers. Must be an owner-approved https:// URL; it is also shown under the code.",
+      "format": "uri",
+      "pattern": "^https://",
+      "maxLength": 300
+    }
+  }
+}
