@@ -168,6 +168,83 @@ test("approves a render, flags input changes and withdraws the approval", async 
   expect(await readdir(path.join(clipDir, "renders/final"))).toContain(`${approval.renderId}.mp4`);
 });
 
+test("archives every output except the approved render, then the render itself", async ({
+  page,
+  request,
+}) => {
+  // A poster-only render gives the clip a second output.
+  const poster = await request.post(`/api/productions/${clipId}/poster`, {
+    data: { profileId: "standard", frame: 5 },
+    headers: ORIGIN,
+  });
+  expect(poster.status(), await poster.text()).toBe(202);
+  const { renderId: posterId } = (await poster.json()) as { renderId: string };
+  await expect
+    .poll(
+      async () =>
+        (
+          (await (await request.get(`/api/renders/${posterId}`)).json()) as {
+            state: { status: string };
+          }
+        ).state.status,
+      { timeout: 120_000 },
+    )
+    .toBe("succeeded");
+
+  await goto(page, `${CLIP_URL}?tab=render`);
+  const outputs = page.locator(".output-item");
+  await expect(outputs).toHaveCount(2);
+  const video = outputs.filter({ has: page.locator("video") });
+  await video.getByRole("button", { name: "Approve as final" }).click();
+  await video.getByRole("button", { name: "Confirm approval" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Render approved" })).toBeVisible();
+  await expect(video.getByRole("button", { name: "Move to archive" })).toHaveCount(0);
+
+  // The approved render cannot be archived, even through the API.
+  const approval = JSON.parse(
+    await readFile(
+      path.join(productionDir("render-test", "output", "clip"), "renders/approved.json"),
+      "utf8",
+    ),
+  ) as { renderId: string };
+  const refused = await request.post(`/api/productions/${clipId}/renders/archive`, {
+    data: { renderIds: [approval.renderId] },
+    headers: ORIGIN,
+  });
+  expect(refused.status()).toBe(409);
+
+  await page.getByRole("button", { name: "Archive the other 1 output…" }).click();
+  await expect(page.getByText("Moves every render except the approved one")).toBeVisible();
+  await page.getByRole("button", { name: "Move 1 to archive" }).click();
+  const moved = page.getByRole("status").filter({ hasText: "Moved 1 render to" });
+  await expect(moved).toBeVisible();
+  await expect(outputs).toHaveCount(1);
+  const archivedPath = (await moved.textContent())!.replace(/^Moved 1 render to /, "").trim();
+  const archive = JSON.parse(
+    await readFile(path.join(process.cwd(), archivedPath, "archive.json"), "utf8"),
+  ) as { renderIds: string[]; files: string[] };
+  expect(archive.renderIds).toEqual([posterId]);
+  expect(archive.files).toEqual([
+    `renders/manifests/${posterId}-poster-f5.poster.json`,
+    `renders/final/${posterId}-poster-f5.png`,
+  ]);
+
+  // Withdraw the approval, then archive the video itself.
+  await page.getByRole("button", { name: "Withdraw approval" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Approval withdrawn" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Archive the other/ })).toHaveCount(0);
+  await outputs.first().getByRole("button", { name: "Move to archive" }).click();
+  await outputs.first().getByRole("button", { name: "Confirm move to archive" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Moved 1 render to" })).toBeVisible();
+  await expect(page.getByText("No successful renders yet")).toBeVisible();
+  const clipDir = productionDir("render-test", "output", "clip");
+  for (const folder of ["renders/final", "renders/manifests"]) {
+    expect((await readdir(path.join(clipDir, folder))).filter((f) => !f.startsWith("."))).toEqual(
+      [],
+    );
+  }
+});
+
 test("cancels a long render and rejects a second render meanwhile", async ({ page, request }) => {
   await goto(page, `${LONG_URL}?tab=render`);
   await page.getByRole("button", { name: "Render MP4 and poster" }).click();

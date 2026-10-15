@@ -82,7 +82,10 @@ try {
     publicDir: request.publicDir,
     outDir: request.bundleDir,
     rootDir: process.cwd(),
-    enableCaching: true,
+    // Remotion keys its webpack cache on the whole bundler config, which
+    // includes this job's own entry and output paths, so a cache entry is never
+    // reused and each render would leave ~180 MB in node_modules/.cache/webpack.
+    enableCaching: false,
     onProgress: (percent) =>
       progress({ type: "progress", phase: "bundling", progress: percent / 100 }),
   });

@@ -124,6 +124,10 @@ Every render lands in `renders/final/`, so mark the one to publish: press **Appr
 - Changes are guarded by the file's hash, like documents, so a stale tab cannot overwrite an approval made elsewhere.
 - Commit `renders/approved.json` together with the approved video, poster and manifest.
 
+### Archiving renders
+
+Renders you do not want to keep can be moved out of the production folder. **Move to archive** on any output except the approved one moves its manifest, video and poster to `workspace/archive/<timestamp>_renders_<production>-<id>/`, keeping their paths below the production folder and recording them in `archive.json`. Once a render is approved, **Archive the other N outputs** does the same for everything else at once, so `renders/final/` holds only what ships. Nothing is deleted, and the approved render cannot be archived until its approval is withdrawn. To restore, move the files back under the production folder.
+
 ## Props
 
 Production-specific values (destination URLs, dates, copy variants) live in `props.json`, never in source. Each production declares their shape in `props.schema.json`, a small, strict subset of JSON Schema:

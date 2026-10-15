@@ -38,7 +38,7 @@ If Astro detects an AI coding agent it starts the dev server in the background; 
 7. **Hand off to Claude Code**: on the **Prompt** tab, edit the request and press **Copy context packet**. Paste both into Claude Code. Claude works only inside the production folder and never commits.
 8. **Preview**: scrub, step frame by frame (← →), jump to the poster frame. Errors show in the player; **Check source** lists type errors with file and line.
 9. **Render**: **Run preflight**, then **Render MP4 and poster** with the `standard` profile (`draft` for quick checks, `high-quality` for masters).
-10. **Approve**: under **Outputs**, press **Approve as final** on the video to publish and add a note (who approved it, for which channel). This writes `renders/approved.json`. If the badge later says _approved, inputs changed since_, the source, props or assets changed after that render: render again and approve the new one if the changes should ship.
+10. **Approve**: under **Outputs**, press **Approve as final** on the video to publish and add a note (who approved it, for which channel). This writes `renders/approved.json`. If the badge later says _approved, inputs changed since_, the source, props or assets changed after that render: render again and approve the new one if the changes should ship. Then press **Archive the other N outputs** to move the drafts and earlier renders to `workspace/archive/`, leaving only the approved render in `renders/final/`.
 11. **Commit**: review with `git status` and `git diff`, then commit the records, source, assets, manifests, `renders/approved.json` and the approved video and poster yourself. Motion Studio never commits, pushes or changes branches.
 
 ### Render profiles
@@ -65,7 +65,7 @@ For productions that must not change by accident, list frames to check in `tests
 
 ### Acceptance
 
-`pnpm acceptance` runs the CookGuide acceptance test from spec section 17: two real renders, output probing, QR decoding from the poster and a paused frame, hash and manifest checks, fingerprint behaviour, golden frames and the failure cases. It takes about two minutes and restores anything it changes.
+`pnpm acceptance` runs the CookGuide acceptance test from spec section 17: two real renders, output probing, QR decoding from the poster and a paused frame, hash and manifest checks, fingerprint behaviour, golden frames and the failure cases. It takes about two minutes and restores anything it changes, except that its two renders stay in the production's Outputs; archive them from the Render tab if you do not want to keep them.
 
 ## 4. Where things live
 
@@ -94,17 +94,18 @@ The repository is the backup unit.
 
 ## 6. Recovery
 
-| Situation                                            | What to do                                                                                                                                                                                                          |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Motion Studio stopped during a render                | Nothing. On the next start the job is marked _interrupted_, its partial files are removed and the lock released. Completed renders are never touched. Render again.                                                 |
-| "Another render is running" but nothing is           | The lock holder's process is gone if this persists after a restart. Motion Studio reclaims locks from dead processes automatically; as a last resort delete `.motion-studio/jobs/active.lock` while no render runs. |
-| Archived something by mistake                        | Move the folder from `workspace/archive/<timestamp>_<scope>_<slug>-<id>/` back to its `originalPath` (in `archive.json`) and delete `archive.json`. Assets: move the file and its `.asset.json` back.               |
-| "This was changed elsewhere" on save                 | Someone (often Claude Code) changed the file on disk. Copy your text, load the latest version, reapply your change. Nothing was overwritten.                                                                        |
-| A record shows a validation issue                    | Open the file named in the issue, fix it (or restore it from Git), run `pnpm validate:workspace`. Records with errors are hidden until fixed.                                                                       |
-| Render tab says _approval broken_                    | `renders/approved.json` names a manifest, video or poster that is missing or has changed. Restore the files from Git, or press **Withdraw approval** and approve a current render.                                  |
-| Asset shows _modified_ or _missing_                  | The file changed after upload or was removed. Restore it from Git, or upload the new version as a new asset and update references.                                                                                  |
-| Preview stuck on "Updating the composition registry" | Reload the page. If it persists, stop the studio, delete `.motion-studio/cache/`, start again.                                                                                                                      |
-| Anything else odd after an upgrade                   | Delete `.motion-studio/cache/` and restart. It is always safe.                                                                                                                                                      |
+| Situation                                            | What to do                                                                                                                                                                                                                                                                               |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Motion Studio stopped during a render                | Nothing. On the next start the job is marked _interrupted_, its partial files are removed and the lock released. Completed renders are never touched. Render again.                                                                                                                      |
+| "Another render is running" but nothing is           | The lock holder's process is gone if this persists after a restart. Motion Studio reclaims locks from dead processes automatically; as a last resort delete `.motion-studio/jobs/active.lock` while no render runs.                                                                      |
+| Archived something by mistake                        | Move the folder from `workspace/archive/<timestamp>_<scope>_<slug>-<id>/` back to its `originalPath` (in `archive.json`) and delete `archive.json`. Assets: move the file and its `.asset.json` back. Renders: move `renders/…` from the archive folder back into the production folder. |
+| "This was changed elsewhere" on save                 | Someone (often Claude Code) changed the file on disk. Copy your text, load the latest version, reapply your change. Nothing was overwritten.                                                                                                                                             |
+| A record shows a validation issue                    | Open the file named in the issue, fix it (or restore it from Git), run `pnpm validate:workspace`. Records with errors are hidden until fixed.                                                                                                                                            |
+| Render tab says _approval broken_                    | `renders/approved.json` names a manifest, video or poster that is missing or has changed. Restore the files from Git, or press **Withdraw approval** and approve a current render.                                                                                                       |
+| Asset shows _modified_ or _missing_                  | The file changed after upload or was removed. Restore it from Git, or upload the new version as a new asset and update references.                                                                                                                                                       |
+| Preview stuck on "Updating the composition registry" | Reload the page. If it persists, stop the studio, delete `.motion-studio/cache/`, start again.                                                                                                                                                                                           |
+| Disk filling up after many renders                   | Earlier versions left about 180 MB of bundler cache per render in `node_modules/.cache/webpack`; it is never reused. Delete that folder. Also archive unwanted renders from the Render tab.                                                                                              |
+| Anything else odd after an upgrade                   | Delete `.motion-studio/cache/` and restart. It is always safe.                                                                                                                                                                                                                           |
 
 ## 7. Troubleshooting
 
@@ -153,6 +154,5 @@ The repository is the backup unit.
 - Thumbnail generation and probed media durations for assets.
 - A render queue instead of "busy", and render presets per channel (for example 1080 × 1350 cut-downs).
 - A diff view for golden-frame failures in the studio.
-- Archiving unapproved renders, so `renders/final/` holds only what ships.
 - Approval per channel or profile (today one render per production is approved).
 - Git LFS guidance tooling once repositories grow large.

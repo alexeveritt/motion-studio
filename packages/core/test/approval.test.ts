@@ -266,3 +266,94 @@ describe("render approval", () => {
     ]);
   });
 });
+
+describe("render archiving", () => {
+  const archiveRoot = () => path.join(workspace.archiveRoot);
+  /** Files under renders/, without the scaffolded .gitkeep placeholders. */
+  const renderFiles = async () =>
+    (await listFiles(path.join(dir, "renders"))).filter((file) => !file.endsWith(".gitkeep"));
+
+  it("moves a render's manifest, video and poster into one archive folder", async () => {
+    const result = await approvals.archiveRenders(productionId, { renderIds: [RENDER_B] });
+    expect(result.archivedPath).toMatch(
+      /^\.motion-studio\/tmp\/archive\/20261015-130000_renders_clip-[0-9a-f]{8}$/,
+    );
+    expect(result.files).toEqual([
+      `renders/manifests/${RENDER_B}.render.json`,
+      `renders/final/${RENDER_B}.mp4`,
+      `renders/final/${RENDER_B}-poster.png`,
+    ]);
+    const folder = path.join(archiveRoot(), path.basename(result.archivedPath));
+    expect(await listFiles(folder)).toEqual(
+      ["archive.json", ...result.files].sort((a, b) => a.localeCompare(b)),
+    );
+    expect(await readJson(path.join(folder, "archive.json"))).toMatchObject({
+      scope: "renders",
+      productionId,
+      originalPath: ".motion-studio/tmp/projects/approve/campaigns/tests/productions/clip",
+      renderIds: [RENDER_B],
+      archivedAt: "2026-10-15T13:00:00.000Z",
+    });
+    expect(await renderFiles()).toEqual([
+      `final/${RENDER_A}-poster.png`,
+      `final/${RENDER_A}.mp4`,
+      `manifests/${RENDER_A}.render.json`,
+    ]);
+    const { outputs } = await new RenderController(workspace, assets).history(productionId);
+    expect(outputs.map((output) => output.manifest.renderId)).toEqual([RENDER_A]);
+  });
+
+  it("refuses to archive the approved render, even when approved.json is broken", async () => {
+    const { hash } = await approvals.approve(productionId, {
+      renderId: RENDER_A,
+      baseHash: EMPTY,
+    });
+    await expect(
+      approvals.archiveRenders(productionId, { renderIds: [RENDER_B, RENDER_A] }),
+    ).rejects.toMatchObject({ code: "IN_USE", message: /Withdraw the approval/ });
+    await writeFile(approvalFile(), serializeJson({ renderId: RENDER_A }));
+    await expect(
+      approvals.archiveRenders(productionId, { renderIds: [RENDER_A] }),
+    ).rejects.toMatchObject({ code: "IN_USE" });
+    // Nothing moved.
+    expect((await renderFiles()).length).toBe(7);
+    expect(hash).not.toBe(EMPTY);
+  });
+
+  it("archives everything except the approved render and leaves the approval intact", async () => {
+    await approvals.approve(productionId, { renderId: RENDER_A, baseHash: EMPTY });
+    await approvals.archiveRenders(productionId, { renderIds: [RENDER_B] });
+    expect((await approvals.status(productionId)).state).toBe("current");
+  });
+
+  it("rejects unknown, duplicate and empty selections without moving anything", async () => {
+    await expect(
+      approvals.archiveRenders(productionId, {
+        renderIds: [RENDER_A, "20261015-120200_clip_standard_cccccccc"],
+      }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(
+      approvals.archiveRenders(productionId, { renderIds: [RENDER_A, RENDER_A] }),
+    ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+    await expect(approvals.archiveRenders(productionId, { renderIds: [] })).rejects.toMatchObject({
+      code: "INVALID_INPUT",
+    });
+    expect((await renderFiles()).length).toBe(6);
+    expect(await listFiles(archiveRoot()).catch(() => [])).toEqual([]);
+  });
+
+  it("archives a render whose video is already missing, recording only what moved", async () => {
+    await rm(path.join(dir, `renders/final/${RENDER_B}.mp4`));
+    const result = await approvals.archiveRenders(productionId, { renderIds: [RENDER_B] });
+    expect(result.files).toEqual([
+      `renders/manifests/${RENDER_B}.render.json`,
+      `renders/final/${RENDER_B}-poster.png`,
+    ]);
+  });
+
+  it("uses a new folder for each archive in the same second", async () => {
+    const first = await approvals.archiveRenders(productionId, { renderIds: [RENDER_A] });
+    const second = await approvals.archiveRenders(productionId, { renderIds: [RENDER_B] });
+    expect(second.archivedPath).toBe(`${first.archivedPath}-2`);
+  });
+});

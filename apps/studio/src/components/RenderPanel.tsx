@@ -7,7 +7,7 @@ import type {
 } from "@motion-studio/core";
 import { formatBytes } from "@motion-studio/core/media";
 import { formatTimecode } from "@motion-studio/core/time";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { api, ApiError } from "../lib/client/api.ts";
 import CopyPath from "./CopyPath.tsx";
 
@@ -30,6 +30,8 @@ type Props = {
   fps: number;
   lastFrame: number;
   initialHistory: History;
+  /** Repository-relative archive folder, shown to the operator. */
+  archiveFolder: string;
 };
 
 const PHASE_LABELS: Record<string, string> = {
@@ -184,6 +186,21 @@ export default function RenderPanel(props: Props) {
       setMessage({ tone: "ok", text: "Approval withdrawn; the render is kept" });
     });
 
+  const archive = (renderIds: string[]) =>
+    run(async () => {
+      const result = await api<{ archivedPath: string; renderIds: string[] }>(
+        "POST",
+        `/api/productions/${productionId}/renders/archive`,
+        { renderIds },
+      );
+      await refreshHistory();
+      const count = result.renderIds.length;
+      setMessage({
+        tone: "ok",
+        text: `Moved ${count} render${count === 1 ? "" : "s"} to ${result.archivedPath}`,
+      });
+    });
+
   const cancel = () =>
     run(async () => {
       if (!activeId) return;
@@ -192,6 +209,9 @@ export default function RenderPanel(props: Props) {
     });
 
   const running = Boolean(activeId);
+  const unapproved = history.outputs
+    .map((entry) => entry.manifest.renderId)
+    .filter((renderId) => renderId !== history.approval.approval?.renderId);
   const state = job?.state;
   return (
     <div className="render-panel">
@@ -306,6 +326,21 @@ export default function RenderPanel(props: Props) {
       <section className="panel" aria-labelledby="history-heading">
         <h2 id="history-heading">Outputs</h2>
         <ApprovalSummary status={history.approval} busy={busy} onWithdraw={() => void withdraw()} />
+        {history.approval.approval && unapproved.length > 0 && (
+          <ConfirmAction
+            label={`Archive the other ${unapproved.length} output${unapproved.length === 1 ? "" : "s"}…`}
+            confirmLabel={`Move ${unapproved.length} to archive`}
+            explanation={
+              <>
+                Moves every render except the approved one (manifests, videos and posters) to{" "}
+                <code>{props.archiveFolder}/</code>, so <code>renders/final</code> holds only what
+                ships. Nothing is deleted.
+              </>
+            }
+            busy={busy}
+            onConfirm={() => archive(unapproved)}
+          />
+        )}
         {history.problems.map((problem) => (
           <p key={problem} className="field-error">
             {problem}
@@ -326,6 +361,8 @@ export default function RenderPanel(props: Props) {
                 approval={history.approval}
                 busy={busy}
                 onApprove={(note) => approve(entry.manifest.renderId, note)}
+                onArchive={() => archive([entry.manifest.renderId])}
+                archiveFolder={props.archiveFolder}
               />
             ))}
           </ul>
@@ -517,6 +554,49 @@ function ApproveControl({
   );
 }
 
+/** A button that asks for confirmation inline before acting. */
+function ConfirmAction({
+  label,
+  confirmLabel,
+  explanation,
+  busy,
+  onConfirm,
+}: {
+  label: string;
+  confirmLabel: string;
+  explanation: ReactNode;
+  busy: boolean;
+  onConfirm: () => Promise<boolean>;
+}) {
+  const [open, setOpen] = useState(false);
+  if (!open)
+    return (
+      <div className="form-actions">
+        <button type="button" onClick={() => setOpen(true)} disabled={busy}>
+          {label}
+        </button>
+      </div>
+    );
+  return (
+    <div className="confirm-action">
+      <p className="muted">{explanation}</p>
+      <div className="form-actions">
+        <button
+          type="button"
+          className="danger"
+          disabled={busy}
+          onClick={() => void onConfirm().then((ok) => ok && setOpen(false))}
+        >
+          {confirmLabel}
+        </button>
+        <button type="button" onClick={() => setOpen(false)} disabled={busy}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function OutputItem({
   entry,
   productionId,
@@ -524,6 +604,8 @@ function OutputItem({
   approval,
   busy,
   onApprove,
+  onArchive,
+  archiveFolder,
 }: {
   entry: HistoryEntry;
   productionId: string;
@@ -531,6 +613,8 @@ function OutputItem({
   approval: ApprovalStatus;
   busy: boolean;
   onApprove: (note: string) => Promise<boolean>;
+  onArchive: () => Promise<boolean>;
+  archiveFolder: string;
 }) {
   const manifest = entry.manifest;
   const approved = entry.kind === "render" && approval.approval?.renderId === manifest.renderId;
@@ -607,6 +691,23 @@ function OutputItem({
             replacing={approval.approval?.renderId}
             busy={busy}
             onApprove={onApprove}
+          />
+        )}
+        {!approved && (
+          <ConfirmAction
+            label="Move to archive"
+            confirmLabel="Confirm move to archive"
+            explanation={
+              <>
+                Moves this{" "}
+                {entry.kind === "render"
+                  ? "render's manifest, video and poster"
+                  : "poster and its manifest"}{" "}
+                to <code>{archiveFolder}/</code>. Nothing is deleted.
+              </>
+            }
+            busy={busy}
+            onConfirm={onArchive}
           />
         )}
       </div>

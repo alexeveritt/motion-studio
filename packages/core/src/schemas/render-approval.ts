@@ -32,6 +32,15 @@ export const renderApprovalInputSchema = z.strictObject({
   note: z.string().trim().max(1000).optional(),
 });
 
+/** Move finished renders to the archive. */
+export const renderArchiveInputSchema = z.strictObject({
+  renderIds: z
+    .array(z.string().min(1).max(100))
+    .min(1)
+    .max(500)
+    .refine((ids) => new Set(ids).size === ids.length, "Each render may be listed once"),
+});
+
 export const renderApprovalRemoveSchema = z.strictObject({
   baseHash: z.string().regex(/^[a-f0-9]{64}$/),
 });

@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm } from "node:fs/promises";
+import { mkdir, readFile, rename, rm } from "node:fs/promises";
 import path from "node:path";
 import { hashFile, type AssetLibrary } from "../assets.ts";
 import { MotionStudioError } from "../errors.ts";
@@ -9,10 +9,13 @@ import {
   renderApprovalInputSchema,
   renderApprovalRemoveSchema,
   renderApprovalSchema,
+  renderArchiveInputSchema,
   type RenderApproval,
 } from "../schemas/render-approval.ts";
 import { renderManifestSchema, type RenderManifest } from "../schemas/render-manifest.ts";
-import { hashContent, type WorkspaceService } from "../workspace.ts";
+import { CURRENT_SCHEMA_VERSION } from "../schemas/common.ts";
+import type { ProductionRecord } from "../schemas/production.ts";
+import { formatStamp, hashContent, type WorkspaceService } from "../workspace.ts";
 import type { RenderController } from "./controller.ts";
 import { computeFingerprint, gatherFingerprintInputs } from "./fingerprint.ts";
 
@@ -40,11 +43,21 @@ export type ApprovalStatus = {
   currentFingerprint?: string;
 };
 
+export type RenderArchiveResult = {
+  /** Repository-relative archive folder. */
+  archivedPath: string;
+  renderIds: string[];
+  /** Production-relative paths of the files moved. */
+  files: string[];
+};
+
 /**
  * Approval of one successful video render per production, recorded in
- * `renders/approved.json` next to the manifests. Changes are guarded by the
- * file's content hash, like documents, so a stale tab cannot overwrite an
- * approval made elsewhere. Render manifests themselves are never modified.
+ * `renders/approved.json` next to the manifests, and archiving of the renders
+ * that are not wanted. Approval changes are guarded by the file's content
+ * hash, like documents, so a stale tab cannot overwrite an approval made
+ * elsewhere. Render manifests themselves are never modified, and nothing is
+ * ever deleted.
  */
 export class RenderApprovals {
   readonly #workspace: WorkspaceService;
@@ -173,6 +186,99 @@ export class RenderApprovals {
     });
   }
 
+  /**
+   * Move finished renders (manifest, video and poster) into the archive,
+   * keeping their paths below the production folder so they can be moved
+   * back. The approved render cannot be archived; withdraw its approval first.
+   */
+  async archiveRenders(productionId: string, rawInput: unknown): Promise<RenderArchiveResult> {
+    const input = parseInput(renderArchiveInputSchema, rawInput, "archive request");
+    const { dir, record } = await this.#workspace.locate("production", productionId);
+    const production = record as ProductionRecord;
+    // Same lock as approving, so a render cannot be approved while it is being archived.
+    return this.#mutex.run(this.#file(dir), async () => {
+      const approvedId = await approvedRenderId(this.#file(dir));
+      if (approvedId !== undefined && input.renderIds.includes(approvedId)) {
+        throw new MotionStudioError(
+          "IN_USE",
+          `${approvedId} is the approved render. Withdraw the approval before archiving it.`,
+        );
+      }
+      const { outputs } = await this.#renders.history(productionId);
+      const moves: string[] = [];
+      for (const renderId of input.renderIds) {
+        const entry = outputs.find((output) => output.manifest.renderId === renderId);
+        if (!entry)
+          throw new MotionStudioError(
+            "NOT_FOUND",
+            `${renderId} is not a render of this production`,
+          );
+        // The manifest moves first: if anything fails part-way, no manifest is
+        // left naming files that have gone.
+        moves.push(
+          path
+            .relative(dir, path.join(this.#workspace.repoRoot, entry.manifestPath))
+            .split(path.sep)
+            .join("/"),
+        );
+        if (entry.kind === "render") moves.push(entry.manifest.video.relativePath);
+        if (entry.manifest.poster) moves.push(entry.manifest.poster.relativePath);
+      }
+
+      const destination = await this.#claimArchiveFolder(production);
+      const moved: string[] = [];
+      for (const relative of moves) {
+        const source = this.#workspace.policy.resolveRelative(dir, relative);
+        const target = this.#workspace.policy.resolveRelative(destination, relative);
+        await mkdir(path.dirname(target), { recursive: true });
+        try {
+          await rename(source, target);
+          moved.push(relative);
+        } catch (error) {
+          // An output already missing from disk has nothing to move.
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+        }
+      }
+      await writeFileAtomic(
+        path.join(destination, "archive.json"),
+        serializeJson({
+          schemaVersion: CURRENT_SCHEMA_VERSION,
+          scope: "renders",
+          productionId,
+          slug: production.slug,
+          originalPath: toRepoRelative(this.#workspace.repoRoot, dir),
+          renderIds: input.renderIds,
+          files: moved,
+          archivedAt: this.#workspace.timestamp(),
+        }),
+      );
+      return {
+        archivedPath: toRepoRelative(this.#workspace.repoRoot, destination),
+        renderIds: input.renderIds,
+        files: moved,
+      };
+    });
+  }
+
+  async #claimArchiveFolder(production: ProductionRecord): Promise<string> {
+    const root = this.#workspace.archiveRoot;
+    await mkdir(root, { recursive: true });
+    const base = `${formatStamp(this.#workspace.now())}_renders_${production.slug}-${production.id.slice(-8)}`;
+    for (let attempt = 1; attempt <= 50; attempt += 1) {
+      const folder = this.#workspace.policy.resolve(
+        root,
+        attempt === 1 ? base : `${base}-${attempt}`,
+      );
+      try {
+        await mkdir(folder);
+        return folder;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      }
+    }
+    throw new MotionStudioError("ALREADY_EXISTS", "Could not create an archive folder");
+  }
+
   #file(productionDir: string): string {
     return this.#workspace.policy.resolve(productionDir, "renders", APPROVAL_FILE);
   }
@@ -251,6 +357,18 @@ async function checkOutputs(
       problems.push(`The ${output.label} ${output.relativePath} changed after rendering`);
   }
   return problems;
+}
+
+/** The render named by approved.json, even when the rest of the file is invalid. */
+async function approvedRenderId(file: string): Promise<string | undefined> {
+  try {
+    const data: unknown = JSON.parse(await readOptional(file));
+    if (data && typeof data === "object" && "renderId" in data && typeof data.renderId === "string")
+      return data.renderId;
+  } catch {
+    // Missing or unreadable: nothing is approved.
+  }
+  return undefined;
 }
 
 async function readOptional(file: string): Promise<string> {

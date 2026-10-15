@@ -232,6 +232,7 @@ const issues = catalog.issues.filter(
           fps={production.record.format.fps}
           lastFrame={production.record.format.durationInFrames - 1}
           initialHistory={renderHistory}
+          archiveFolder={archiveFolder}
         />
       )}
       {tab === "brief" && brief && (
