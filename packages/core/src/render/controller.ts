@@ -45,7 +45,7 @@ export type JobStatus = "running" | "succeeded" | "failed" | "cancelled" | "inte
 export type JobState = {
   schemaVersion: 1;
   renderId: string;
-  kind: "render" | "poster";
+  kind: "render" | "poster" | "frames";
   productionId: string;
   productionSlug: string;
   profileId: string;
@@ -63,7 +63,7 @@ export type JobState = {
   pid?: number;
   error?: { code: string; message: string };
   /** Repository-relative paths of the committed outputs. */
-  outputs?: { video?: string; poster: string; manifest: string };
+  outputs?: { video?: string; poster?: string; manifest?: string; frames?: string[] };
   warnings: string[];
 };
 
@@ -98,6 +98,7 @@ const PHASE_BANDS: Record<RenderPhase, [number, number]> = {
   checking: [0.15, 0.2],
   rendering: [0.2, 0.95],
   poster: [0.95, 0.98],
+  frames: [0.2, 0.98],
   finalising: [0.98, 1],
   done: [1, 1],
 };
@@ -187,12 +188,16 @@ export class RenderController {
     return runPreflight(this.#workspace, this.#assets, productionId, profileId);
   }
 
-  /** Start a render (or a poster-only render). Throws BUSY or PREFLIGHT_FAILED. */
+  /**
+   * Start a render, a poster-only render, or a golden-frames render (stills
+   * for comparison, no manifest). Throws BUSY or PREFLIGHT_FAILED.
+   */
   async start(options: {
     productionId: string;
     profileId: string;
-    kind?: "render" | "poster";
+    kind?: "render" | "poster" | "frames";
     frame?: number;
+    frames?: number[];
   }): Promise<JobState> {
     const kind = options.kind ?? "render";
     if (this.activeRenderId) throw busy(this.activeRenderId);
@@ -215,6 +220,18 @@ export class RenderController {
         throw new MotionStudioError("INVALID_INPUT", `Frame must be between 0 and ${lastFrame}`);
       }
 
+      if (kind === "frames") {
+        const frames = options.frames ?? [];
+        if (
+          frames.length === 0 ||
+          frames.some((frame) => !Number.isInteger(frame) || frame < 0 || frame > lastFrame)
+        ) {
+          throw new MotionStudioError(
+            "INVALID_INPUT",
+            `Frames must be whole numbers between 0 and ${lastFrame}`,
+          );
+        }
+      }
       const requestedAt = this.#workspace.now();
       const renderId = await this.#uniqueRenderId(
         renderBaseName(requestedAt, production.slug, profile.id, preflight.fingerprint),
@@ -260,10 +277,19 @@ export class RenderController {
         publicDir,
         bundleDir: path.join(jobDir, "bundle"),
         smokeDir: path.join(jobDir, "smoke"),
-        outputs: {
-          ...(kind === "render" ? { video: path.join(jobDir, `${renderId}.partial.mp4`) } : {}),
-          poster: path.join(jobDir, `${renderId}.partial.png`),
-        },
+        outputs:
+          kind === "frames"
+            ? {
+                frames: [...new Set(options.frames ?? [])]
+                  .sort((a, b) => a - b)
+                  .map((frame) => ({ frame, path: path.join(jobDir, `frame-${frame}.png`) })),
+              }
+            : {
+                ...(kind === "render"
+                  ? { video: path.join(jobDir, `${renderId}.partial.mp4`) }
+                  : {}),
+                poster: path.join(jobDir, `${renderId}.partial.png`),
+              },
         frameTimeoutMs: 30_000,
       };
       const requestPath = path.join(jobDir, "request.json");
@@ -280,7 +306,12 @@ export class RenderController {
         status: "running",
         phase: "preflight",
         progress: PHASE_BANDS.preflight[1],
-        totalFrames: kind === "render" ? production.format.durationInFrames : 1,
+        totalFrames:
+          kind === "render"
+            ? production.format.durationInFrames
+            : kind === "frames"
+              ? (options.frames?.length ?? 0)
+              : 1,
         requestedAt: requestedAt.toISOString(),
         startedAt: this.#workspace.timestamp(),
         warnings: preflight.checks
@@ -598,7 +629,11 @@ export class RenderController {
     await mkdir(finalDir, { recursive: true });
     await mkdir(manifestsDir, { recursive: true });
 
-    const posterProbe = await probeImage(request.outputs.poster);
+    if (request.kind === "frames") return this.#finaliseFrames(active, expectedSize);
+    if (!request.outputs.poster)
+      throw new MotionStudioError("RENDER_FAILED", "No poster was requested");
+    const poster = request.outputs.poster;
+    const posterProbe = await probeImage(poster);
     if (
       posterProbe.codec !== "png" ||
       posterProbe.width !== expectedSize.width ||
@@ -637,11 +672,11 @@ export class RenderController {
         const videoFile = path.join(finalDir, names.video);
         const posterFile = path.join(finalDir, names.poster);
         const videoHash = await hashFile(request.outputs.video);
-        const posterHash = await hashFile(request.outputs.poster);
+        const posterHash = await hashFile(poster);
         const { size: videoBytes } = await stat(request.outputs.video);
         await moveNoOverwrite(request.outputs.video, videoFile);
         moved.push(videoFile);
-        await moveNoOverwrite(request.outputs.poster, posterFile);
+        await moveNoOverwrite(poster, posterFile);
         moved.push(posterFile);
 
         const manifest = renderManifestSchema.parse({
@@ -688,9 +723,9 @@ export class RenderController {
 
       const names = posterOnlyNames(request.renderId, request.posterFrame);
       const posterFile = path.join(finalDir, names.poster);
-      const posterHash = await hashFile(request.outputs.poster);
-      const { size: posterBytes } = await stat(request.outputs.poster);
-      await moveNoOverwrite(request.outputs.poster, posterFile);
+      const posterHash = await hashFile(poster);
+      const { size: posterBytes } = await stat(poster);
+      await moveNoOverwrite(poster, posterFile);
       moved.push(posterFile);
       const manifest = posterManifestSchema.parse({
         schemaVersion: 1,
@@ -727,6 +762,37 @@ export class RenderController {
       for (const file of moved) await rm(file, { force: true });
       throw error;
     }
+  }
+
+  /** Golden-frame stills: check their size and move them to a scratch folder for comparison. No manifest. */
+  async #finaliseFrames(
+    active: Active,
+    expectedSize: { width: number; height: number },
+  ): Promise<NonNullable<JobState["outputs"]>> {
+    const target = this.#workspace.policy.resolve(
+      this.#workspace.tmpRoot,
+      "golden",
+      active.request.renderId,
+    );
+    await mkdir(target, { recursive: true });
+    const frames: string[] = [];
+    for (const { frame, path: file } of active.request.outputs.frames ?? []) {
+      const probe = await probeImage(file);
+      if (
+        probe.codec !== "png" ||
+        probe.width !== expectedSize.width ||
+        probe.height !== expectedSize.height
+      ) {
+        throw new MotionStudioError(
+          "VIDEO_VALIDATION_FAILED",
+          `Frame ${frame} is ${probe.width}×${probe.height}, expected ${expectedSize.width}×${expectedSize.height}`,
+        );
+      }
+      const destination = path.join(target, `frame-${frame}.png`);
+      await moveNoOverwrite(file, destination);
+      frames.push(toRepoRelative(this.#workspace.repoRoot, destination));
+    }
+    return { frames };
   }
 
   /** Copy the production's registered assets into the job's public folder and re-verify their hashes. */

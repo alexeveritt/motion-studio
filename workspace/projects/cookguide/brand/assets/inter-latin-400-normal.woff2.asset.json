@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "01a13f5a-7ed9-7333-a3b7-b8dbf0b44acd",
+  "originalName": "inter-latin-400-normal.woff2",
+  "storedName": "inter-latin-400-normal.woff2",
+  "mediaType": "font",
+  "mimeType": "font/woff2",
+  "bytes": 23664,
+  "sha256": "8909904ab6c872eb994093482a88a28eca2cd95912d7b6fecd72103b0dc07edc",
+  "source": "Inter by Rasmus Andersson, via @fontsource/inter 5.3.0 (npm)",
+  "licenceNotes": "SIL Open Font License 1.1; licence text stored as brand asset inter-ofl-licence.txt",
+  "altText": "Inter Regular 400",
+  "createdAt": "2026-10-15T11:37:37.760Z"
+}

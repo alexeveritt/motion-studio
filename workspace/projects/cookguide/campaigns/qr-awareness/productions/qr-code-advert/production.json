@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "01a13f5a-7f92-736b-b504-211bc5da4a87",
+  "projectId": "01a13f5a-7e7e-73a3-a846-b6dd14f817ab",
+  "campaignId": "01a13f5a-7f6b-70b2-9933-08229b54d1b5",
+  "slug": "qr-code-advert",
+  "title": "CookGuide QR Code Advert",
+  "description": "12-second portrait advert ending on a large, static, scannable QR code.",
+  "status": "idea",
+  "compositionId": "cookguide-qr-code-advert",
+  "format": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "durationInFrames": 360
+  },
+  "files": {
+    "brief": "brief.md",
+    "prompt": "prompt.md",
+    "notes": "notes.md",
+    "entry": "src/composition.tsx"
+  },
+  "defaultRenderProfileId": "standard",
+  "posterFrame": 300,
+  "tags": ["qr", "portrait", "acceptance"],
+  "createdAt": "2026-10-15T11:37:37.938Z",
+  "updatedAt": "2026-10-15T11:37:37.938Z",
+  "revision": 1
+}

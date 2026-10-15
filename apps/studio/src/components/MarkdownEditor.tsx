@@ -10,11 +10,20 @@ type Props = {
   kind: string;
   label: string;
   initial: Document;
+  /** "json" validates as a JSON object and previews the parsed value instead of rendering Markdown. */
+  language?: "markdown" | "json";
 };
 
 type View = "split" | "edit" | "preview";
 
-export default function MarkdownEditor({ scope, id, kind, label, initial }: Props) {
+export default function MarkdownEditor({
+  scope,
+  id,
+  kind,
+  label,
+  initial,
+  language = "markdown",
+}: Props) {
   const [content, setContent] = useState(initial.content);
   const [saved, setSaved] = useState(initial);
   const [view, setView] = useState<View>("split");
@@ -25,7 +34,14 @@ export default function MarkdownEditor({ scope, id, kind, label, initial }: Prop
 
   const url = `/api/documents/${scope}/${id}/${kind}`;
   const dirty = content !== saved.content;
-  const html = useMemo(() => renderMarkdown(content), [content]);
+  const html = useMemo(
+    () => (language === "markdown" ? renderMarkdown(content) : ""),
+    [content, language],
+  );
+  const jsonCheck = useMemo(
+    () => (language === "json" ? checkJsonObject(content) : undefined),
+    [content, language],
+  );
 
   useEffect(() => {
     if (!dirty) return;
@@ -35,7 +51,7 @@ export default function MarkdownEditor({ scope, id, kind, label, initial }: Prop
   }, [dirty]);
 
   async function save() {
-    if (busy || !dirty) return;
+    if (busy || !dirty || jsonCheck?.error) return;
     setBusy(true);
     setMessage(undefined);
     try {
@@ -108,7 +124,7 @@ export default function MarkdownEditor({ scope, id, kind, label, initial }: Prop
           type="button"
           className="primary"
           onClick={() => void save()}
-          disabled={busy || !dirty}
+          disabled={busy || !dirty || Boolean(jsonCheck?.error)}
         >
           {busy ? "Saving…" : "Save"}
         </button>
@@ -141,7 +157,23 @@ export default function MarkdownEditor({ scope, id, kind, label, initial }: Prop
             onChange={(event) => setContent(event.target.value)}
           />
         )}
-        {view !== "edit" && (
+        {view !== "edit" && jsonCheck && (
+          <div className="md-preview" aria-label={`${label} preview`}>
+            {jsonCheck.error ? (
+              <p className="field-error" role="alert">
+                {jsonCheck.error}
+              </p>
+            ) : (
+              <>
+                <span className="badge" data-tone="ok">
+                  valid JSON object
+                </span>
+                <pre className="json-preview">{jsonCheck.formatted}</pre>
+              </>
+            )}
+          </div>
+        )}
+        {view !== "edit" && !jsonCheck && (
           // Rendered with raw HTML disabled; see lib/client/markdown.ts.
           <div
             className="md-preview prose"
@@ -152,4 +184,16 @@ export default function MarkdownEditor({ scope, id, kind, label, initial }: Prop
       </div>
     </section>
   );
+}
+
+function checkJsonObject(text: string): { error?: string; formatted?: string } {
+  if (text.trim() === "") return { error: "Empty. Use {} for no props." };
+  try {
+    const value: unknown = JSON.parse(text);
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      return { error: 'Must be a JSON object, e.g. { "qrUrl": "https://…" }' };
+    return { formatted: JSON.stringify(value, null, 2) };
+  } catch (error) {
+    return { error: `Not valid JSON: ${error instanceof Error ? error.message : "parse error"}` };
+  }
 }

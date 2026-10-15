@@ -124,7 +124,7 @@ export type Scope = z.infer<typeof scope>;
 export const DOCUMENTS = {
   project: { context: "context.md", brand: "brand/brand.md" },
   campaign: { brief: "brief.md" },
-  production: { brief: "brief.md", prompt: "prompt.md", notes: "notes.md" },
+  production: { brief: "brief.md", prompt: "prompt.md", notes: "notes.md", props: "props.json" },
 } as const satisfies Record<Scope, Record<string, string>>;
 
 export type DocumentKind<S extends Scope = Scope> = keyof (typeof DOCUMENTS)[S] & string;

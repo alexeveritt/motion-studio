@@ -1,0 +1,5 @@
+{
+  "frames": [0, 30, 59, 60, 120, 179, 180, 225, 269, 270, 300, 330, 359],
+  "profileId": "standard",
+  "tolerance": { "channelThreshold": 16, "maxDifferentRatio": 0.002 }
+}

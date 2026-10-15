@@ -4,7 +4,7 @@ A local-only workspace for organising, previewing and rendering code-driven moti
 
 The full build specification is in [`docs/SPEC.md`](docs/SPEC.md).
 
-> **Status: Milestone 4 (rendering and posters).** Projects, campaigns, productions, documents and assets are managed in the studio; productions preview with exact frame control; and named profiles render validated H.264 MP4s, posters and manifests. Milestone 5 (hardening and the CookGuide acceptance production) is next.
+> **Status: version one complete.** All five milestones are implemented and the CookGuide acceptance production passes `pnpm acceptance` (with placeholder artwork and a placeholder QR destination until approved ones are supplied). Day-to-day operation, backup, recovery and troubleshooting are in the [operator guide](docs/operator-guide.md).
 
 ## Requirements
 

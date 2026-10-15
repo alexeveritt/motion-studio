@@ -9,7 +9,7 @@ import type { MediaRenderOptions } from "./options.ts";
 export type RenderRequest = {
   schemaVersion: 1;
   renderId: string;
-  kind: "render" | "poster";
+  kind: "render" | "poster" | "frames";
   productionId: string;
   compositionId: string;
   profileId: string;
@@ -22,7 +22,8 @@ export type RenderRequest = {
   publicDir: string;
   bundleDir: string;
   smokeDir: string;
-  outputs: { video?: string; poster: string };
+  /** Video and poster for renders; poster for poster jobs; frames for golden-frame jobs. */
+  outputs: { video?: string; poster?: string; frames?: { frame: number; path: string }[] };
   /** Per-frame delayRender timeout. */
   frameTimeoutMs: number;
 };
@@ -50,6 +51,7 @@ export type RenderPhase =
   | "checking"
   | "rendering"
   | "poster"
+  | "frames"
   | "finalising"
   | "done";
 

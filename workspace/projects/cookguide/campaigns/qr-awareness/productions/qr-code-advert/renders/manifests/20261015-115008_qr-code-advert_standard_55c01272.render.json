@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "renderId": "20261015-115008_qr-code-advert_standard_55c01272",
+  "productionId": "01a13f5a-7f92-736b-b504-211bc5da4a87",
+  "compositionId": "cookguide-qr-code-advert",
+  "profileId": "standard",
+  "requestedAt": "2026-10-15T11:50:08.684Z",
+  "startedAt": "2026-10-15T11:50:08.767Z",
+  "completedAt": "2026-10-15T11:50:28.001Z",
+  "status": "succeeded",
+  "inputFingerprint": "55c012724f1ab7164f4c6b38addf49350d901f4c4a5a4ff76576f3a023284cfb",
+  "git": {
+    "commit": "ff51ba8214ce0250f1b2eefe88760a7843340b8d",
+    "dirty": true
+  },
+  "environment": {
+    "node": "v24.11.0",
+    "pnpm": "11.25.0",
+    "remotion": "4.0.535",
+    "platform": "darwin",
+    "architecture": "arm64"
+  },
+  "video": {
+    "relativePath": "renders/final/20261015-115008_qr-code-advert_standard_55c01272.mp4",
+    "sha256": "046b1ded2461898c9b90b7585bfe0680194259abc16c05498b5acce259a8b63e",
+    "bytes": 602013,
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "durationInFrames": 360,
+    "durationSeconds": 12,
+    "codec": "h264",
+    "pixelFormat": "yuv420p"
+  },
+  "poster": {
+    "relativePath": "renders/final/20261015-115008_qr-code-advert_standard_55c01272-poster.png",
+    "frame": 300,
+    "sha256": "80ee8df8b2c562ffffd54ec7a27b8517fef0d2ace00474b9e9e39f4e2cc724c6"
+  },
+  "warnings": [
+    "Git state recorded: ff51ba8214ce, with uncommitted changes (recorded in the manifest)"
+  ]
+}

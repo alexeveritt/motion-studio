@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "01a13f5a-7f6b-70b2-9933-08229b54d1b5",
+  "projectId": "01a13f5a-7e7e-73a3-a846-b6dd14f817ab",
+  "slug": "qr-awareness",
+  "name": "QR Awareness",
+  "description": "Short vertical adverts that send viewers to CookGuide through a QR code.",
+  "objective": "Get home cooks to scan a QR code and start cooking with CookGuide.",
+  "audience": ["Home cooks", "People deciding what to cook tonight"],
+  "keyMessages": ["CookGuide guides you through every recipe step by step"],
+  "channels": ["Instagram Stories", "Instagram Reels", "TikTok", "In-store screens"],
+  "status": "active",
+  "briefFile": "brief.md",
+  "createdAt": "2026-10-15T11:37:37.899Z",
+  "updatedAt": "2026-10-15T11:37:37.927Z",
+  "revision": 2
+}

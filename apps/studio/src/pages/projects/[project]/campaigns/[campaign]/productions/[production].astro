@@ -37,6 +37,7 @@ const TABS = [
   { id: "brief", label: "Brief" },
   { id: "prompt", label: "Prompt" },
   { id: "notes", label: "Notes" },
+  { id: "props", label: "Props" },
   { id: "assets", label: "Assets" },
   { id: "files", label: "Files" },
 ];
@@ -46,7 +47,7 @@ const id = production?.record.id;
 
 const brief = id ? await workspace.readDocument("production", id, "brief") : undefined;
 const documentTab =
-  id && (tab === "prompt" || tab === "notes")
+  id && (tab === "prompt" || tab === "notes" || tab === "props")
     ? await workspace.readDocument("production", id, tab)
     : undefined;
 const files = id && tab === "files" ? await workspace.listFiles("production", id) : [];
@@ -270,6 +271,24 @@ const issues = catalog.issues.filter(
           initial={productionAssets}
           maxUploadBytes={maxUploadBytes}
         />
+      )}
+      {tab === "props" && documentTab && (
+        <>
+          <p class="muted">
+            Input props for preview and render, merged over the composition's{" "}
+            <code>defaultProps</code>. Put production-specific values here (destination URLs, dates,
+            copy variants), never in the source.
+          </p>
+          <MarkdownEditor
+            client:load
+            scope="production"
+            id={production.record.id}
+            kind="props"
+            label="Props"
+            language="json"
+            initial={documentTab.exists ? documentTab : { ...documentTab, content: "{}\n" }}
+          />
+        </>
       )}
       {tab === "files" && (
         <section class="panel">

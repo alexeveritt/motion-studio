@@ -10,6 +10,7 @@
     "check": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "qrcode-generator": "2.0.4",
     "react": "19.3.0",
     "remotion": "4.0.535"
   },

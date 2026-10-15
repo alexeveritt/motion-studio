@@ -910,3 +910,10 @@ pre.diff span[data-op="remove"] {
   font-size: 0.9rem;
   min-width: 0;
 }
+
+.json-preview {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

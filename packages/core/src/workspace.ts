@@ -391,6 +391,7 @@ export class WorkspaceService {
     rawInput: unknown,
   ): Promise<DocumentContent> {
     const input = parseInput(documentSaveInputSchema, rawInput, "document");
+    if (scopeName === "production" && kind === "props") assertPropsJson(input.content);
     const file = await this.#documentFile(scopeName, id, kind);
     return this.#mutex.run(file, async () => {
       const current = await this.readDocument(scopeName, id, kind);
@@ -707,6 +708,22 @@ export class WorkspaceService {
   #timestamp(): string {
     return this.#now().toISOString();
   }
+}
+
+/** props.json must be a JSON object within the size limit; anything else is refused on save. */
+function assertPropsJson(content: string): void {
+  const fail = (message: string) => {
+    throw new SchemaValidationError("props.json", [{ path: "content", message }], "INVALID_INPUT");
+  };
+  if (content.length > MAX_PROPS_BYTES) fail("props.json is larger than 256 KB");
+  let value: unknown;
+  try {
+    value = JSON.parse(content);
+  } catch (error) {
+    fail(`Not valid JSON: ${error instanceof Error ? error.message : "parse error"}`);
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    fail("props.json must contain a JSON object");
 }
 
 export function formatLimitIssues(format: ProductionFormat, settings: Settings): FieldIssue[] {

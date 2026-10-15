@@ -148,17 +148,36 @@ try {
     });
   }
 
-  send({ type: "phase", phase: "poster" });
-  await renderStill({
-    ...common,
-    composition,
-    frame: request.posterFrame,
-    output: request.outputs.poster,
-    imageFormat: "png",
-    scale: request.options.scale,
-    overwrite: false,
-    cancelSignal,
-  });
+  if (request.kind === "frames") {
+    // Golden frames: full-quality PNG stills for comparison with baselines.
+    send({ type: "phase", phase: "frames" });
+    const frames = request.outputs.frames ?? [];
+    for (const [index, { frame, path: output }] of frames.entries()) {
+      await renderStill({
+        ...common,
+        composition,
+        frame,
+        output,
+        imageFormat: "png",
+        scale: request.options.scale,
+        overwrite: false,
+        cancelSignal,
+      });
+      progress({ type: "progress", phase: "frames", progress: (index + 1) / frames.length });
+    }
+  } else if (request.outputs.poster) {
+    send({ type: "phase", phase: "poster" });
+    await renderStill({
+      ...common,
+      composition,
+      frame: request.posterFrame,
+      output: request.outputs.poster,
+      imageFormat: "png",
+      scale: request.options.scale,
+      overwrite: false,
+      cancelSignal,
+    });
+  }
 
   send({ type: "done" });
   await browser.close({ silent: true });

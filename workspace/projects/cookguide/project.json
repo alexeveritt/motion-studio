@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "01a13f5a-7e7e-73a3-a846-b6dd14f817ab",
+  "slug": "cookguide",
+  "name": "CookGuide",
+  "description": "Step-by-step recipe guidance. Acceptance project for Motion Studio version one.",
+  "status": "active",
+  "defaultRenderProfileId": "standard",
+  "contextFile": "context.md",
+  "brandFile": "brand/brand.md",
+  "createdAt": "2026-10-15T11:37:37.662Z",
+  "updatedAt": "2026-10-15T11:37:37.662Z",
+  "revision": 1
+}

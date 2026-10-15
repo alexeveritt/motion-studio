@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "01a13f5a-7f1b-7236-a87b-1e721eec7d1c",
+  "originalName": "inter-latin-800-normal.woff2",
+  "storedName": "inter-latin-800-normal.woff2",
+  "mediaType": "font",
+  "mimeType": "font/woff2",
+  "bytes": 24400,
+  "sha256": "a7d0a50f15d389cad679238466bdb5fc9787aa0715719064ce25abaff042820d",
+  "source": "Inter by Rasmus Andersson, via @fontsource/inter 5.3.0 (npm)",
+  "licenceNotes": "SIL Open Font License 1.1; licence text stored as brand asset inter-ofl-licence.txt",
+  "altText": "Inter ExtraBold 800",
+  "createdAt": "2026-10-15T11:37:37.824Z"
+}

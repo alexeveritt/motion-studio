@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "01a13f5a-7f39-775a-b440-86679109ba83",
+  "originalName": "inter-ofl-licence.txt",
+  "storedName": "inter-ofl-licence.txt",
+  "mediaType": "document",
+  "mimeType": "text/plain",
+  "bytes": 4477,
+  "sha256": "3b0a5fca3d17942cde889069889dedbbbd075e9b599968c82a95f4d944e9b345",
+  "source": "LICENSE file from @fontsource/inter 5.3.0",
+  "licenceNotes": "SIL Open Font License 1.1 text, kept alongside the Inter font files as the licence requires",
+  "createdAt": "2026-10-15T11:37:37.852Z"
+}

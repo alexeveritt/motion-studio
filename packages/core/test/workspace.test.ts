@@ -468,3 +468,26 @@ describe("listFiles", () => {
     ]);
   });
 });
+
+describe("props.json document", () => {
+  it("saves a JSON object and refuses anything else", async () => {
+    const { production } = await createHierarchy();
+    const current = await service.readDocument("production", production.id, "props");
+    expect(current).toMatchObject({ exists: false, content: "" });
+    const saved = await service.saveDocument("production", production.id, "props", {
+      content: '{ "qrUrl": "https://cookguide.example/start" }\n',
+      baseHash: current.hash,
+    });
+    expect((await service.readProductionProps(production.id)).props).toEqual({
+      qrUrl: "https://cookguide.example/start",
+    });
+    for (const content of ["[1]", "{ nope", '"text"']) {
+      await expect(
+        service.saveDocument("production", production.id, "props", {
+          content,
+          baseHash: saved.hash,
+        }),
+      ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+    }
+  });
+});

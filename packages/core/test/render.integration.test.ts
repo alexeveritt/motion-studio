@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AssetLibrary, hashFile } from "../src/assets.ts";
 import { loadSettings } from "../src/repo.ts";
+import { runGolden } from "../src/golden.ts";
 import { PreflightFailedError, RenderController } from "../src/render/controller.ts";
 import { probeImage, probeVideo } from "../src/render/probe.ts";
 import { posterManifestSchema, renderManifestSchema } from "../src/schemas/render-manifest.ts";
@@ -222,6 +223,43 @@ describe("rendering", () => {
       const history = await controller.history(production.id);
       expect(history.outputs.map((o) => o.kind)).toEqual(["poster", "render", "render"]);
       expect(history.problems).toEqual([]);
+    },
+    TIMEOUT,
+  );
+});
+
+describe("golden frames", () => {
+  it(
+    "records baselines, passes unchanged output and catches a visible change",
+    async () => {
+      await mkdir(path.join(dir, "tests"), { recursive: true });
+      await writeFile(path.join(dir, "tests/golden.json"), JSON.stringify({ frames: [0, 15, 29] }));
+
+      const updated = await runGolden(workspace, controller, production.id, { update: true });
+      expect(updated.frames.map((f) => f.status)).toEqual(["updated", "updated", "updated"]);
+      expect((await readdir(path.join(dir, "tests/golden"))).sort()).toEqual([
+        "frame-0.png",
+        "frame-15.png",
+        "frame-29.png",
+      ]);
+
+      const same = await runGolden(workspace, controller, production.id);
+      expect(same.ok).toBe(true);
+      expect(same.frames.map((f) => f.status)).toEqual(["pass", "pass", "pass"]);
+
+      const original = await readFile(entryFile(), "utf8");
+      await writeFile(
+        entryFile(),
+        original.replace('background: "#202020"', 'background: "#2060c0"'),
+      );
+      try {
+        const changed = await runGolden(workspace, controller, production.id);
+        expect(changed.ok).toBe(false);
+        expect(changed.frames.every((f) => f.status === "fail" && f.diff)).toBe(true);
+        expect(changed.frames[0]!.comparison!.differentRatio).toBeGreaterThan(0.5);
+      } finally {
+        await writeFile(entryFile(), original);
+      }
     },
     TIMEOUT,
   );
