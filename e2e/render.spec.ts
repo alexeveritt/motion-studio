@@ -1,4 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import { goto, productionDir } from "./helpers.ts";
@@ -109,6 +109,63 @@ test("serves outputs with byte ranges and refuses files outside the manifests", 
   for (const bad of ["..%2Fproduction.json", "production.json", "nope.mp4"]) {
     expect((await request.get(`/api/productions/${clipId}/outputs/${bad}`)).status()).toBe(404);
   }
+});
+
+test("approves a render, flags input changes and withdraws the approval", async ({
+  page,
+  request,
+}) => {
+  const clipDir = productionDir("render-test", "output", "clip");
+  const approvedFile = path.join(clipDir, "renders/approved.json");
+  await goto(page, `${CLIP_URL}?tab=render`);
+  const summary = page.getByLabel("Approved render");
+  await expect(summary).toContainText("No render is approved yet");
+
+  const output = page.locator(".output-item").first();
+  await output.getByRole("button", { name: "Approve as final" }).click();
+  await output.getByLabel("Approval note (optional)").fill("Approved for the e2e channel");
+  await output.getByRole("button", { name: "Confirm approval" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Render approved" })).toBeVisible();
+  await expect(output).toContainText("Approved final");
+  await expect(output.getByRole("button", { name: "Approve as final" })).toHaveCount(0);
+  await expect(summary).toContainText("approved");
+  await expect(summary).toContainText("Approved for the e2e channel");
+
+  const approval = JSON.parse(await readFile(approvedFile, "utf8")) as {
+    renderId: string;
+    video: { relativePath: string };
+  };
+  const manifests = await readdir(path.join(clipDir, "renders/manifests"));
+  expect(manifests).toContain(`${approval.renderId}.render.json`);
+  expect(approval.video.relativePath).toBe(`renders/final/${approval.renderId}.mp4`);
+
+  // A stale hash is refused.
+  const stale = await request.put(`/api/productions/${clipId}/approval`, {
+    data: { renderId: approval.renderId, baseHash: "0".repeat(64) },
+    headers: ORIGIN,
+  });
+  expect(stale.status()).toBe(409);
+
+  // Changing the source after approval marks it outdated; restoring clears it.
+  const entry = path.join(clipDir, "src/composition.tsx");
+  const original = await readFile(entry, "utf8");
+  try {
+    await writeFile(entry, `${original}\n// changed after approval\n`);
+    await page.reload();
+    await expect(summary).toContainText("approved, inputs changed since");
+    await expect(summary).toContainText("Render again and approve the new render");
+  } finally {
+    await writeFile(entry, original);
+  }
+  await page.reload();
+  await expect(summary.locator(".badge")).toHaveText("approved");
+
+  await summary.getByRole("button", { name: "Withdraw approval" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Approval withdrawn" })).toBeVisible();
+  await expect(summary).toContainText("No render is approved yet");
+  await expect(readFile(approvedFile)).rejects.toThrow();
+  expect(manifests.length).toBeGreaterThan(0);
+  expect(await readdir(path.join(clipDir, "renders/final"))).toContain(`${approval.renderId}.mp4`);
 });
 
 test("cancels a long render and rejects a second render meanwhile", async ({ page, request }) => {

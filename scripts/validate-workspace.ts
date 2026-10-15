@@ -1,12 +1,13 @@
 /**
  * Validate every project, campaign and production record, their
- * cross-references, and every asset sidecar and file hash. Exits non-zero
+ * cross-references, every asset sidecar and file hash, props against their
+ * schema, and approved renders against their files. Exits non-zero
  * when any error is found.
  *
  *   pnpm validate:workspace
  *   pnpm validate:workspace -- --workspace fixtures/workspace/projects
  */
-import { propsStatus } from "@motion-studio/core";
+import { propsStatus, RenderApprovals, RenderController } from "@motion-studio/core";
 import { openWorkspace, parseCliArgs, runCli } from "./lib/cli.ts";
 
 await runCli(async () => {
@@ -14,6 +15,7 @@ await runCli(async () => {
   const { workspace, assets } = await openWorkspace(values.workspace);
   const catalog = await workspace.scan();
   const issues = [...catalog.issues, ...(await assets.validate(catalog))];
+  const approvals = new RenderApprovals(workspace, assets, new RenderController(workspace, assets));
 
   // props.json against props.schema.json, the same rule preflight applies.
   for (const production of catalog.projects.flatMap((p) =>
@@ -30,6 +32,19 @@ await runCli(async () => {
         path: `${production.path}/props.json`,
         message,
       });
+    }
+
+    // renders/approved.json: a broken approval is an error, an outdated one a warning.
+    const approval = await approvals.status(production.record.id);
+    if (approval.state === "broken" || approval.state === "outdated") {
+      for (const message of approval.problems) {
+        issues.push({
+          severity: approval.state === "broken" ? "error" : "warning",
+          code: "REFERENCE_MISMATCH",
+          path: approval.path,
+          message,
+        });
+      }
     }
   }
 

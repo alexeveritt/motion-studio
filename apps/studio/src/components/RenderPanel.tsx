@@ -1,4 +1,10 @@
-import type { HistoryEntry, JobState, JobView, PreflightResult } from "@motion-studio/core";
+import type {
+  ApprovalStatus,
+  HistoryEntry,
+  JobState,
+  JobView,
+  PreflightResult,
+} from "@motion-studio/core";
 import { formatBytes } from "@motion-studio/core/media";
 import { formatTimecode } from "@motion-studio/core/time";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -12,6 +18,7 @@ type History = {
   jobs: JobState[];
   problems: string[];
   activeRenderId: string | null;
+  approval: ApprovalStatus;
 };
 
 type Props = {
@@ -100,18 +107,24 @@ export default function RenderPanel(props: Props) {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
   }, [job?.log.length]);
 
-  async function run(task: () => Promise<void>) {
+  /** Run an action, showing its error. Resolves to whether it succeeded. */
+  async function run(task: () => Promise<void>): Promise<boolean> {
     setBusy(true);
     setMessage(undefined);
     try {
       await task();
+      return true;
     } catch (error) {
       if (error instanceof ApiError && error.body.preflight)
         setPreflight(error.body.preflight as PreflightResult);
+      // Someone approved or withdrew elsewhere: show what is on disk now.
+      if (error instanceof ApiError && error.code === "REVISION_CONFLICT")
+        await refreshHistory().catch(() => undefined);
       setMessage({
         tone: "error",
         text: error instanceof Error ? error.message : "Something went wrong",
       });
+      return false;
     } finally {
       setBusy(false);
     }
@@ -148,6 +161,28 @@ export default function RenderPanel(props: Props) {
       ...(Number.isInteger(frame) ? { frame } : {}),
     });
   };
+
+  const approve = (renderId: string, note: string) =>
+    run(async () => {
+      const approval = await api<ApprovalStatus>(
+        "PUT",
+        `/api/productions/${productionId}/approval`,
+        { renderId, baseHash: history.approval.hash, ...(note.trim() ? { note } : {}) },
+      );
+      setHistory((current) => ({ ...current, approval }));
+      setMessage({ tone: "ok", text: "Render approved" });
+    });
+
+  const withdraw = () =>
+    run(async () => {
+      const approval = await api<ApprovalStatus>(
+        "DELETE",
+        `/api/productions/${productionId}/approval`,
+        { baseHash: history.approval.hash },
+      );
+      setHistory((current) => ({ ...current, approval }));
+      setMessage({ tone: "ok", text: "Approval withdrawn; the render is kept" });
+    });
 
   const cancel = () =>
     run(async () => {
@@ -270,6 +305,7 @@ export default function RenderPanel(props: Props) {
 
       <section className="panel" aria-labelledby="history-heading">
         <h2 id="history-heading">Outputs</h2>
+        <ApprovalSummary status={history.approval} busy={busy} onWithdraw={() => void withdraw()} />
         {history.problems.map((problem) => (
           <p key={problem} className="field-error">
             {problem}
@@ -287,6 +323,9 @@ export default function RenderPanel(props: Props) {
                 entry={entry}
                 productionId={productionId}
                 fps={props.fps}
+                approval={history.approval}
+                busy={busy}
+                onApprove={(note) => approve(entry.manifest.renderId, note)}
               />
             ))}
           </ul>
@@ -351,25 +390,156 @@ function PreflightReport({ result }: { result: PreflightResult }) {
   );
 }
 
+const APPROVAL_TONE: Record<ApprovalStatus["state"], string> = {
+  none: "",
+  current: "ok",
+  outdated: "warn",
+  broken: "error",
+};
+
+const APPROVAL_LABEL: Record<ApprovalStatus["state"], string> = {
+  none: "none",
+  current: "approved",
+  outdated: "approved, inputs changed since",
+  broken: "approval broken",
+};
+
+/** Which render is the approved final, and whether it still holds. */
+function ApprovalSummary({
+  status,
+  busy,
+  onWithdraw,
+}: {
+  status: ApprovalStatus;
+  busy: boolean;
+  onWithdraw: () => void;
+}) {
+  const approval = status.approval;
+  return (
+    <div className="approval-summary" data-state={status.state} aria-label="Approved render">
+      <div className="section-header">
+        <h3>Approved final</h3>
+        {status.state !== "none" && (
+          <span className="badge" data-tone={APPROVAL_TONE[status.state]}>
+            {APPROVAL_LABEL[status.state]}
+          </span>
+        )}
+      </div>
+      {status.state === "none" ? (
+        <p className="muted">
+          No render is approved yet. Press <strong>Approve as final</strong> on the video to
+          publish; it is recorded in <code>{status.path}</code>.
+        </p>
+      ) : (
+        <>
+          {approval && (
+            <>
+              <p>
+                <code>{approval.renderId}</code> · {approval.profileId} · approved{" "}
+                {formatWhen(approval.approvedAt)}
+              </p>
+              {approval.note && <p className="approval-note">{approval.note}</p>}
+              <CopyPath
+                path={`${status.path.slice(0, -"renders/approved.json".length)}${approval.video.relativePath}`}
+              />
+            </>
+          )}
+          {status.problems.map((problem) => (
+            <p key={problem} className={status.state === "broken" ? "field-error" : "muted"}>
+              {problem}
+            </p>
+          ))}
+          <div className="form-actions">
+            <button type="button" onClick={onWithdraw} disabled={busy}>
+              Withdraw approval
+            </button>
+            <span className="muted">
+              Commit <code>renders/approved.json</code> with the approved video, poster and
+              manifest.
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ApproveControl({
+  replacing,
+  busy,
+  onApprove,
+}: {
+  replacing: string | undefined;
+  busy: boolean;
+  onApprove: (note: string) => Promise<boolean>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState("");
+  if (!open)
+    return (
+      <div className="form-actions">
+        <button type="button" onClick={() => setOpen(true)} disabled={busy}>
+          Approve as final
+        </button>
+      </div>
+    );
+  return (
+    <div className="approve-form">
+      <label className="field">
+        <span>Approval note (optional)</span>
+        <textarea
+          rows={2}
+          maxLength={1000}
+          value={note}
+          placeholder="Who approved it, for which channel"
+          onChange={(event) => setNote(event.target.value)}
+        />
+      </label>
+      {replacing && (
+        <p className="muted">
+          This replaces the approval of <code>{replacing}</code>. That render is kept.
+        </p>
+      )}
+      <div className="form-actions">
+        <button
+          type="button"
+          className="primary"
+          disabled={busy}
+          onClick={() => void onApprove(note).then((ok) => ok && setOpen(false))}
+        >
+          Confirm approval
+        </button>
+        <button type="button" onClick={() => setOpen(false)} disabled={busy}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function OutputItem({
   entry,
   productionId,
   fps,
+  approval,
+  busy,
+  onApprove,
 }: {
   entry: HistoryEntry;
   productionId: string;
   fps: number;
+  approval: ApprovalStatus;
+  busy: boolean;
+  onApprove: (note: string) => Promise<boolean>;
 }) {
   const manifest = entry.manifest;
+  const approved = entry.kind === "render" && approval.approval?.renderId === manifest.renderId;
   const url = (relativePath: string) =>
     `/api/productions/${productionId}/outputs/${encodeURIComponent(relativePath.split("/").pop()!)}`;
   const posterUrl = manifest.poster ? url(manifest.poster.relativePath) : undefined;
-  const when = new Date(manifest.completedAt).toLocaleString("en-GB", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  const when = formatWhen(manifest.completedAt);
   return (
-    <li className="output-item">
+    <li className="output-item" data-approved={approved ? "" : undefined}>
       <div className="output-media">
         {entry.kind === "render" ? (
           <video
@@ -386,6 +556,14 @@ function OutputItem({
         <div>
           <strong>{entry.kind === "render" ? "Video" : "Poster"}</strong> · {manifest.profileId} ·{" "}
           {when}
+          {approved && (
+            <>
+              {" "}
+              <span className="badge" data-tone={APPROVAL_TONE[approval.state]}>
+                Approved final
+              </span>
+            </>
+          )}
         </div>
         {entry.kind === "render" ? (
           <div className="muted">
@@ -424,9 +602,20 @@ function OutputItem({
           <div className="muted">{manifest.warnings.length} warning(s) recorded</div>
         )}
         <CopyPath path={entry.manifestPath} />
+        {entry.kind === "render" && !approved && (
+          <ApproveControl
+            replacing={approval.approval?.renderId}
+            busy={busy}
+            onApprove={onApprove}
+          />
+        )}
       </div>
     </li>
   );
+}
+
+function formatWhen(iso: string): string {
+  return new Date(iso).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
 }
 
 function capitalise(text: string): string {

@@ -1,16 +1,18 @@
 import { parseInput } from "@motion-studio/core";
 import { z } from "zod";
 import { handler, param, readJsonBody } from "../../../../lib/server/http.ts";
-import { getRenders } from "../../../../lib/server/studio.ts";
+import { getApprovals, getRenders } from "../../../../lib/server/studio.ts";
 
 const body = z.strictObject({ profileId: z.string().min(1).max(64) });
 
-/** Output history: successful manifests, recent unsuccessful jobs and the active render. */
+/** Output history: successful manifests, recent unsuccessful jobs, the active render and the approval. */
 export const GET = handler(async (context) => {
   const renders = await getRenders();
+  const id = param(context, "id");
   return {
-    ...(await renders.history(param(context, "id"))),
+    ...(await renders.history(id)),
     activeRenderId: renders.activeRenderId ?? null,
+    approval: await (await getApprovals()).status(id),
   };
 });
 

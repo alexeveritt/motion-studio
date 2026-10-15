@@ -38,7 +38,8 @@ If Astro detects an AI coding agent it starts the dev server in the background; 
 7. **Hand off to Claude Code**: on the **Prompt** tab, edit the request and press **Copy context packet**. Paste both into Claude Code. Claude works only inside the production folder and never commits.
 8. **Preview**: scrub, step frame by frame (← →), jump to the poster frame. Errors show in the player; **Check source** lists type errors with file and line.
 9. **Render**: **Run preflight**, then **Render MP4 and poster** with the `standard` profile (`draft` for quick checks, `high-quality` for masters).
-10. **Commit**: review with `git status` and `git diff`, then commit the records, source, assets, manifests and approved outputs yourself. Motion Studio never commits, pushes or changes branches.
+10. **Approve**: under **Outputs**, press **Approve as final** on the video to publish and add a note (who approved it, for which channel). This writes `renders/approved.json`. If the badge later says _approved, inputs changed since_, the source, props or assets changed after that render: render again and approve the new one if the changes should ship.
+11. **Commit**: review with `git status` and `git diff`, then commit the records, source, assets, manifests, `renders/approved.json` and the approved video and poster yourself. Motion Studio never commits, pushes or changes branches.
 
 ### Render profiles
 
@@ -68,16 +69,17 @@ For productions that must not change by accident, list frames to check in `tests
 
 ## 4. Where things live
 
-| Path                                   | What                                                                                  | Commit?       |
-| -------------------------------------- | ------------------------------------------------------------------------------------- | ------------- |
-| `workspace/projects/<project>/`        | Projects, campaigns, productions, briefs, prompts, assets and sidecars, source, tests | Yes           |
-| `…/productions/<p>/renders/manifests/` | Render manifests: inputs, environment, Git state, output hashes                       | Yes           |
-| `…/productions/<p>/renders/final/`     | Rendered MP4s and posters                                                             | Approved ones |
-| `workspace/archive/`                   | Archived records and assets (never deleted)                                           | Yes           |
-| `.motion-studio/settings.json`         | Port, limits, render profiles                                                         | Yes           |
-| `.motion-studio/cache/`                | Generated composition registry; safe to delete                                        | No (ignored)  |
-| `.motion-studio/jobs/`                 | Render job state and logs                                                             | No (ignored)  |
-| `.motion-studio/tmp/`                  | Upload staging, prompt candidates, golden-frame diffs, test workspaces                | No (ignored)  |
+| Path                                      | What                                                                                  | Commit?       |
+| ----------------------------------------- | ------------------------------------------------------------------------------------- | ------------- |
+| `workspace/projects/<project>/`           | Projects, campaigns, productions, briefs, prompts, assets and sidecars, source, tests | Yes           |
+| `…/productions/<p>/renders/manifests/`    | Render manifests: inputs, environment, Git state, output hashes                       | Yes           |
+| `…/productions/<p>/renders/final/`        | Rendered MP4s and posters                                                             | Approved ones |
+| `…/productions/<p>/renders/approved.json` | Which render is the approved final, with hashes of its files                          | Yes           |
+| `workspace/archive/`                      | Archived records and assets (never deleted)                                           | Yes           |
+| `.motion-studio/settings.json`            | Port, limits, render profiles                                                         | Yes           |
+| `.motion-studio/cache/`                   | Generated composition registry; safe to delete                                        | No (ignored)  |
+| `.motion-studio/jobs/`                    | Render job state and logs                                                             | No (ignored)  |
+| `.motion-studio/tmp/`                     | Upload staging, prompt candidates, golden-frame diffs, test workspaces                | No (ignored)  |
 
 Every record is plain JSON or Markdown; you can read and edit them directly. Run `pnpm validate:workspace` after hand edits.
 
@@ -99,6 +101,7 @@ The repository is the backup unit.
 | Archived something by mistake                        | Move the folder from `workspace/archive/<timestamp>_<scope>_<slug>-<id>/` back to its `originalPath` (in `archive.json`) and delete `archive.json`. Assets: move the file and its `.asset.json` back.               |
 | "This was changed elsewhere" on save                 | Someone (often Claude Code) changed the file on disk. Copy your text, load the latest version, reapply your change. Nothing was overwritten.                                                                        |
 | A record shows a validation issue                    | Open the file named in the issue, fix it (or restore it from Git), run `pnpm validate:workspace`. Records with errors are hidden until fixed.                                                                       |
+| Render tab says _approval broken_                    | `renders/approved.json` names a manifest, video or poster that is missing or has changed. Restore the files from Git, or press **Withdraw approval** and approve a current render.                                  |
 | Asset shows _modified_ or _missing_                  | The file changed after upload or was removed. Restore it from Git, or upload the new version as a new asset and update references.                                                                                  |
 | Preview stuck on "Updating the composition registry" | Reload the page. If it persists, stop the studio, delete `.motion-studio/cache/`, start again.                                                                                                                      |
 | Anything else odd after an upgrade                   | Delete `.motion-studio/cache/` and restart. It is always safe.                                                                                                                                                      |
@@ -150,5 +153,6 @@ The repository is the backup unit.
 - Thumbnail generation and probed media durations for assets.
 - A render queue instead of "busy", and render presets per channel (for example 1080 × 1350 cut-downs).
 - A diff view for golden-frame failures in the studio.
-- An approval workflow that marks a specific render as the approved final.
+- Archiving unapproved renders, so `renders/final/` holds only what ships.
+- Approval per channel or profile (today one render per production is approved).
 - Git LFS guidance tooling once repositories grow large.

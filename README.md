@@ -108,11 +108,21 @@ Render from a production's **Render** tab or with `pnpm render`. Both use the sa
 2. A worker process (`scripts/render-worker.ts`, spawned with an argument array, no shell and a minimal environment) bundles only this production, renders **sample frames** (start, quarters, end and poster) to catch runtime errors early, then renders the MP4 and the poster.
 3. The controller re-checks the fingerprint, probes the video with ffprobe (H.264, `yuv420p`, size, FPS, exact frame count, duration) and the poster, hashes both, moves them into `renders/final/` without overwriting anything, and writes the manifest to `renders/manifests/` last.
 
-Outputs follow `YYYYMMDD-HHmmss_<production>_<profile>_<fingerprint-8>.mp4`, `…-poster.png` and `….render.json`. Commit the manifests (and approved finals). Failed or cancelled renders never produce a manifest; their partial files are deleted and the log is kept in `.motion-studio/jobs/<render-id>/log.txt`.
+Outputs follow `YYYYMMDD-HHmmss_<production>_<profile>_<fingerprint-8>.mp4`, `…-poster.png` and `….render.json`. Commit the manifests and the approved final (see below). Failed or cancelled renders never produce a manifest; their partial files are deleted and the log is kept in `.motion-studio/jobs/<render-id>/log.txt`.
 
 Only one render runs at a time on the machine (a lock in `.motion-studio/jobs/`), whether started from the studio or the CLI; a second request gets a "busy" error. Cancel sends SIGTERM, then SIGKILL after five seconds. Renders are limited by `renderTimeoutSeconds`. If Motion Studio stops mid-render, the job is marked interrupted on the next start and its partial files removed; completed renders are never deleted.
 
 The first render downloads Remotion's pinned headless Chrome (cached afterwards). Rendering runs with `TZ=UTC`.
+
+### Approving a render
+
+Every render lands in `renders/final/`, so mark the one to publish: press **Approve as final** on a video in the Render tab's **Outputs**, with an optional note (who approved it, for which channel). The approval is written to `renders/approved.json`, with the render ID, profile, input fingerprint and the SHA-256 of its manifest, video and poster. Render manifests are never changed.
+
+- One render per production is approved; approving another replaces it, and **Withdraw approval** removes it. Renders themselves are kept either way.
+- The Render tab checks the approval each time it loads. It shows **approved** when the files are intact and the inputs unchanged, **approved, inputs changed since** when source, props, assets, settings or dependencies have changed since that render (render again and approve the new one if the changes should ship), and **approval broken** when `approved.json` is invalid or a file it names is missing or changed.
+- `pnpm validate:workspace` reports broken approvals as errors and outdated ones as warnings.
+- Changes are guarded by the file's hash, like documents, so a stale tab cannot overwrite an approval made elsewhere.
+- Commit `renders/approved.json` together with the approved video, poster and manifest.
 
 ## Props
 

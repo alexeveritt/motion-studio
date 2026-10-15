@@ -8,3 +8,4 @@ export * from "./render-manifest.ts";
 export * from "./settings.ts";
 export * from "./parse.ts";
 export * from "./inputs.ts";
+export * from "./render-approval.ts";

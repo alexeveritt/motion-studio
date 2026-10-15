@@ -1,6 +1,7 @@
 import {
   AssetLibrary,
   findRepoRoot,
+  RenderApprovals,
   RenderController,
   loadSettings,
   resolveJobsRoot,
@@ -84,4 +85,16 @@ export function getRenders(): Promise<RenderController> {
     renders = undefined;
   });
   return renders;
+}
+
+let approvals: Promise<RenderApprovals> | undefined;
+
+/** Approval of one render per production (renders/approved.json). */
+export function getApprovals(): Promise<RenderApprovals> {
+  approvals ??= (async () =>
+    new RenderApprovals(await getWorkspace(), await getAssets(), await getRenders()))();
+  approvals.catch(() => {
+    approvals = undefined;
+  });
+  return approvals;
 }

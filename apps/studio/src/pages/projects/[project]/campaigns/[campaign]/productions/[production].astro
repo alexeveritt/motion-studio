@@ -14,7 +14,7 @@ import RenderPanel from "../../../../../../components/RenderPanel.tsx";
 import Tabs from "../../../../../../components/Tabs.astro";
 import Base from "../../../../../../layouts/Base.astro";
 import { productionTone } from "../../../../../../lib/format.ts";
-import { getRenders, refreshRegistry } from "../../../../../../lib/server/studio.ts";
+import { getApprovals, getRenders, refreshRegistry } from "../../../../../../lib/server/studio.ts";
 import {
   campaignUrl,
   findCampaign,
@@ -61,7 +61,11 @@ const productionProps =
 const renders = id && tab === "render" ? await getRenders() : undefined;
 const renderHistory =
   id && renders
-    ? { ...(await renders.history(id)), activeRenderId: renders.activeRenderId ?? null }
+    ? {
+        ...(await renders.history(id)),
+        activeRenderId: renders.activeRenderId ?? null,
+        approval: await (await getApprovals()).status(id),
+      }
     : undefined;
 const sections = brief ? sectionCompleteness(brief.content) : [];
 const filled = sections.filter((s) => s.filled).length;

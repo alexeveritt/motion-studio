@@ -85,6 +85,7 @@ export async function buildContextPacket(
 - Work only inside \`${production.path}/\`, chiefly \`src/\` and \`tests/\`.
 - Change shared code in \`packages/motion-runtime\` only when it is clearly needed by more than one production, and say why.
 - Do not edit \`production.json\` by hand; change format, duration, poster frame and status in Motion Studio.
+- Do not edit anything under \`renders/\`: outputs, manifests and \`renders/approved.json\` are written by Motion Studio. Approving a render is the operator's decision.
 - Do not commit, push, or change branches.`,
 
     `## Repository
