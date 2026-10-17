@@ -128,6 +128,10 @@ Every render lands in `renders/final/`, so mark the one to publish: press **Appr
 
 Renders you do not want to keep can be moved out of the production folder. **Move to archive** on any output except the approved one moves its manifest, video and poster to `workspace/archive/<timestamp>_renders_<production>-<id>/`, keeping their paths below the production folder and recording them in `archive.json`. Once a render is approved, **Archive the other N outputs** does the same for everything else at once, so `renders/final/` holds only what ships. Nothing is deleted, and the approved render cannot be archived until its approval is withdrawn. To restore, move the files back under the production folder.
 
+### Golden frames
+
+List frames in a production's `tests/golden.json` (`{ "frames": [0, 59, 60, 359] }`, optional `profileId` and `tolerance`) and commit baselines in `tests/golden/`. The **Golden frames** tab renders those frames, compares them pixel by pixel with the baselines, and shows baseline, new frame and a red difference image side by side; intended changes are accepted as new baselines per frame after confirmation. `pnpm golden -- <production-id> [--update]` does the same from the command line. See the [operator guide](docs/operator-guide.md#golden-frames) for tolerance details.
+
 ## Props
 
 Production-specific values (destination URLs, dates, copy variants) live in `props.json`, never in source. Each production declares their shape in `props.schema.json`, a small, strict subset of JSON Schema:

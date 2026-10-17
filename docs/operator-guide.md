@@ -61,7 +61,11 @@ For productions that must not change by accident, list frames to check in `tests
 }
 ```
 
-`pnpm golden -- <production-id> --update` records baselines in `tests/golden/`. Review them before committing; baseline updates are deliberate. `pnpm golden -- <production-id>` re-renders and compares: a pixel differs when any colour channel moves by more than `channelThreshold` (0–255), and a frame passes while at most `maxDifferentRatio` of its pixels differ (0.002 = 0.2 %). Failing frames get a diff image (changed pixels in red) under `.motion-studio/tmp/golden/`.
+A pixel differs when any colour channel moves by more than `channelThreshold` (0–255), and a frame passes while at most `maxDifferentRatio` of its pixels differ (0.002 = 0.2 %).
+
+In the studio, open the production's **Golden frames** tab and press **Run golden check**. It renders the frames (like any render, one at a time and after preflight), compares them, and shows each frame's baseline, new frame and difference image (changed pixels in red) side by side, with the share of pixels that differ. Frames that match are hidden until you untick **Only show frames that need attention**. When a change is intended, press **Accept new frame as baseline** on that frame (or **Accept all** for every changed frame); frames without a baseline get **Save as baseline**. Each asks for confirmation and writes `tests/golden/frame-<n>.png`; review the change with `git diff` before committing.
+
+From the command line, `pnpm golden -- <production-id>` re-renders and compares (exit code 1 on any difference), and `pnpm golden -- <production-id> --update` replaces every baseline. Reports and diff images are kept under `.motion-studio/tmp/golden/<render-id>/` (ignored by Git), and the studio shows the latest one from either route.
 
 ### Acceptance
 
@@ -153,6 +157,5 @@ The repository is the backup unit.
 - Nested objects and lists in the props schema (for example a list of recipe steps).
 - Thumbnail generation and probed media durations for assets.
 - A render queue instead of "busy", and render presets per channel (for example 1080 × 1350 cut-downs).
-- A diff view for golden-frame failures in the studio.
 - Approval per channel or profile (today one render per production is approved).
 - Git LFS guidance tooling once repositories grow large.

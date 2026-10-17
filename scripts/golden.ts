@@ -34,10 +34,12 @@ await runCli(async () => {
       ? ` ${(frame.comparison.differentRatio * 100).toFixed(3)}% differ, max channel Δ ${frame.comparison.maxChannelDelta}`
       : "";
     console.error(
-      `${frame.status.padEnd(16)} frame ${String(frame.frame).padStart(4)}${detail}${frame.diff ? `  diff: ${frame.diff}` : ""}`,
+      `${frame.status.padEnd(16)} frame ${String(frame.frame).padStart(4)}${detail}${frame.status === "fail" && frame.diff ? `  diff: ${frame.diff}` : ""}`,
     );
   }
   if (values.update)
     console.error("Baselines updated. Review them with git diff before committing.");
+  else if (!report.ok)
+    console.error("Open the production's Golden frames tab in the studio to compare side by side.");
   return report.ok ? 0 : 1;
 });

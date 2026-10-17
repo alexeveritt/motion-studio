@@ -1,4 +1,4 @@
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import { goto, productionDir } from "./helpers.ts";
@@ -166,6 +166,83 @@ test("approves a render, flags input changes and withdraws the approval", async 
   await expect(readFile(approvedFile)).rejects.toThrow();
   expect(manifests.length).toBeGreaterThan(0);
   expect(await readdir(path.join(clipDir, "renders/final"))).toContain(`${approval.renderId}.mp4`);
+});
+
+test("golden frames: explains setup, saves baselines, shows a diff and accepts a change", async ({
+  page,
+  request,
+}) => {
+  await goto(page, `${LONG_URL}?tab=golden`);
+  await expect(page.getByText("has no", { exact: false })).toContainText("tests/golden.json");
+
+  const clipDir = productionDir("render-test", "output", "clip");
+  await writeFile(path.join(clipDir, "tests/golden.json"), JSON.stringify({ frames: [0, 20] }));
+  const propsFile = path.join(clipDir, "props.json");
+  const originalProps = await readFile(propsFile, "utf8").catch(() => undefined);
+  try {
+    await goto(page, `${CLIP_URL}?tab=golden`);
+    await expect(page.getByText("2 of 2 frames have no baseline yet")).toBeVisible();
+    await page.getByRole("button", { name: "Run golden check" }).click();
+    await expect(
+      page.getByRole("alert").filter({ hasText: "Golden check: 2 have no baseline" }),
+    ).toBeVisible({ timeout: 120_000 });
+    const frame0 = page.getByRole("listitem", { name: "Frame 0" });
+    const newFrame = frame0.getByRole("img", { name: "New frame, frame 0" });
+    await expect
+      .poll(() => newFrame.evaluate((img: HTMLImageElement) => img.naturalWidth))
+      .toBe(240);
+
+    await page.getByRole("button", { name: "Accept all 2 as baselines…" }).click();
+    await page.getByRole("button", { name: "Save 2 baselines" }).click();
+    await expect(
+      page.getByRole("status").filter({ hasText: "Saved 2 new baselines" }),
+    ).toBeVisible();
+    expect((await readdir(path.join(clipDir, "tests/golden"))).sort()).toEqual([
+      "frame-0.png",
+      "frame-20.png",
+    ]);
+
+    // A visible change: a different headline.
+    await writeFile(propsFile, JSON.stringify({ headline: "Changed headline" }));
+    await page.reload();
+    await page.getByRole("button", { name: "Run golden check" }).click();
+    // Frame 0 is before the headline fades in, so only frame 20 changes.
+    await expect(page.getByRole("alert").filter({ hasText: "Golden check: 1 differ" })).toBeVisible(
+      { timeout: 120_000 },
+    );
+    await expect(page.getByRole("listitem", { name: "Frame 0" })).toHaveCount(0);
+    const frame20 = page.getByRole("listitem", { name: "Frame 20" });
+    await expect(frame20).toContainText("differs");
+    await expect(frame20).toContainText("of pixels differ");
+    for (const name of ["Baseline", "New frame", "Difference (red)"]) {
+      const image = frame20.getByRole("img", { name: `${name}, frame 20` });
+      await expect
+        .poll(() => image.evaluate((img: HTMLImageElement) => img.naturalWidth))
+        .toBe(240);
+    }
+    const before = await readFile(path.join(clipDir, "tests/golden/frame-20.png"));
+    await frame20.getByRole("button", { name: "Accept new frame as baseline…" }).click();
+    await frame20.getByRole("button", { name: "Save baseline" }).click();
+    await expect(
+      page.getByRole("status").filter({ hasText: "Saved 1 new baseline" }),
+    ).toBeVisible();
+    await expect(frame20).toContainText("new baseline");
+    expect(await readFile(path.join(clipDir, "tests/golden/frame-20.png"))).not.toEqual(before);
+
+    // Images outside this production's reports are refused.
+    for (const query of [
+      "kind=actual&frame=0&renderId=..%2F..%2Fx",
+      "kind=actual&frame=0",
+      "kind=other&frame=0",
+      "kind=baseline&frame=-1",
+    ]) {
+      const response = await request.get(`/api/productions/${clipId}/golden/image?${query}`);
+      expect(response.status(), query).toBe(404);
+    }
+  } finally {
+    if (originalProps === undefined) await rm(propsFile, { force: true });
+    else await writeFile(propsFile, originalProps);
+  }
 });
 
 test("archives every output except the approved render, then the render itself", async ({

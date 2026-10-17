@@ -1,9 +1,15 @@
 ---
-import { formatDurationLabel, formatTimecode, sectionCompleteness } from "@motion-studio/core";
+import {
+  formatDurationLabel,
+  formatTimecode,
+  goldenStatus,
+  sectionCompleteness,
+} from "@motion-studio/core";
 import ArchiveButton from "../../../../../../components/ArchiveButton.tsx";
 import AssetLibrary from "../../../../../../components/AssetLibrary.tsx";
 import Breadcrumbs from "../../../../../../components/Breadcrumbs.astro";
 import CopyPath from "../../../../../../components/CopyPath.tsx";
+import GoldenPanel from "../../../../../../components/GoldenPanel.tsx";
 import MarkdownEditor from "../../../../../../components/MarkdownEditor.tsx";
 import NotFound from "../../../../../../components/NotFound.astro";
 import ProductionForm from "../../../../../../components/ProductionForm.tsx";
@@ -35,6 +41,7 @@ const TABS = [
   { id: "overview", label: "Overview" },
   { id: "preview", label: "Preview" },
   { id: "render", label: "Render" },
+  { id: "golden", label: "Golden frames" },
   { id: "brief", label: "Brief" },
   { id: "prompt", label: "Prompt" },
   { id: "notes", label: "Notes" },
@@ -67,6 +74,7 @@ const renderHistory =
         approval: await (await getApprovals()).status(id),
       }
     : undefined;
+const golden = id && tab === "golden" ? await goldenStatus(workspace, id) : undefined;
 const sections = brief ? sectionCompleteness(brief.content) : [];
 const filled = sections.filter((s) => s.filled).length;
 const profile = workspace.settings.renderProfiles.find(
@@ -233,6 +241,16 @@ const issues = catalog.issues.filter(
           lastFrame={production.record.format.durationInFrames - 1}
           initialHistory={renderHistory}
           archiveFolder={archiveFolder}
+        />
+      )}
+      {tab === "golden" && golden && (
+        <GoldenPanel
+          client:load
+          productionId={production.record.id}
+          fps={production.record.format.fps}
+          posterFrame={production.record.posterFrame}
+          lastFrame={production.record.format.durationInFrames - 1}
+          initial={golden}
         />
       )}
       {tab === "brief" && brief && (

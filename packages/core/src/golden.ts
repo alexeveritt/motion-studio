@@ -1,11 +1,13 @@
-import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { PNG } from "pngjs";
 import { z } from "zod";
 import { MotionStudioError } from "./errors.ts";
+import { serializeJson, writeFileAtomic } from "./fs-store.ts";
 import { toRepoRelative } from "./repo.ts";
 import type { ProductionRecord } from "./schemas/production.ts";
-import type { RenderController } from "./render/controller.ts";
+import type { JobState, RenderController } from "./render/controller.ts";
+import { isRenderId } from "./render/naming.ts";
 import type { WorkspaceService } from "./workspace.ts";
 
 /**
@@ -97,10 +99,16 @@ export type GoldenReport = {
   ok: boolean;
   productionId: string;
   renderId: string;
+  profileId: string;
+  comparedAt: string;
   tolerance: GoldenConfig["tolerance"];
   frames: GoldenFrameResult[];
 };
 
+const REPORT_FILE = "report.json";
+const FRAME_FILE = /^frame-(\d+)\.png$/;
+
+/** Read and validate tests/golden.json. NOT_FOUND when absent, SCHEMA_INVALID when broken. */
 export async function readGoldenConfig(
   workspace: WorkspaceService,
   productionId: string,
@@ -116,28 +124,83 @@ export async function readGoldenConfig(
       `${toRepoRelative(workspace.repoRoot, file)} not found. Create it with { "frames": [0, 59, 60, ...] }.`,
     );
   }
-  const parsed = goldenConfigSchema.safeParse(JSON.parse(raw));
-  if (!parsed.success)
+  let data: unknown;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    throw new MotionStudioError("SCHEMA_INVALID", "tests/golden.json is not valid JSON");
+  }
+  const parsed = goldenConfigSchema.safeParse(data);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
     throw new MotionStudioError(
       "SCHEMA_INVALID",
-      `tests/golden.json: ${parsed.error.issues[0]?.message}`,
+      `tests/golden.json${issue?.path.length ? ` ${issue.path.join(".")}` : ""}: ${issue?.message}`,
     );
+  }
   return parsed.data;
 }
 
-/**
- * Render the configured frames and compare them with the committed
- * baselines in `tests/golden/`. With `update`, the rendered frames replace
- * the baselines instead; review the change in Git before committing.
- */
-export async function runGolden(
+export type GoldenStatus = {
+  /** Repository-relative path of tests/golden.json. */
+  configPath: string;
+  config?: GoldenConfig;
+  configError?: string;
+  /** Each configured frame and whether its committed baseline exists. */
+  baselines: { frame: number; path: string; exists: boolean }[];
+  /** The most recent comparison for this production, from the studio or `pnpm golden`. */
+  latest?: GoldenReport;
+};
+
+/** Configuration, baselines and the latest report, for the studio's Golden frames tab. */
+export async function goldenStatus(
+  workspace: WorkspaceService,
+  productionId: string,
+): Promise<GoldenStatus> {
+  const { dir } = await workspace.locate("production", productionId);
+  const configPath = toRepoRelative(
+    workspace.repoRoot,
+    workspace.policy.resolve(dir, "tests", "golden.json"),
+  );
+  let config: GoldenConfig | undefined;
+  let configError: string | undefined;
+  try {
+    config = await readGoldenConfig(workspace, productionId);
+  } catch (error) {
+    if (!(error instanceof MotionStudioError)) throw error;
+    if (error.code !== "NOT_FOUND") configError = error.message;
+  }
+  const baselines = await Promise.all(
+    (config?.frames ?? []).map(async (frame) => {
+      const file = baselineFile(workspace, dir, frame);
+      return {
+        frame,
+        path: toRepoRelative(workspace.repoRoot, file),
+        exists: await readFile(file).then(
+          () => true,
+          () => false,
+        ),
+      };
+    }),
+  );
+  const latest = await latestReport(workspace, productionId);
+  return {
+    configPath,
+    ...(config ? { config } : {}),
+    ...(configError ? { configError } : {}),
+    baselines,
+    ...(latest ? { latest } : {}),
+  };
+}
+
+/** Start rendering the configured frames. Throws BUSY or PREFLIGHT_FAILED like any render. */
+export async function startGolden(
   workspace: WorkspaceService,
   controller: RenderController,
   productionId: string,
-  options: { update?: boolean } = {},
-): Promise<GoldenReport> {
+): Promise<JobState> {
   const config = await readGoldenConfig(workspace, productionId);
-  const { dir, record } = await workspace.locate("production", productionId);
+  const { record } = await workspace.locate("production", productionId);
   const lastFrame = (record as ProductionRecord).format.durationInFrames - 1;
   const outOfRange = config.frames.filter((frame) => frame > lastFrame);
   if (outOfRange.length)
@@ -145,30 +208,46 @@ export async function runGolden(
       "INVALID_INPUT",
       `Golden frames out of range: ${outOfRange.join(", ")}`,
     );
-
-  const job = await controller.start({
+  return controller.start({
     productionId,
     profileId: config.profileId,
     kind: "frames",
     frames: config.frames,
   });
-  const state = await controller.wait(job.renderId);
+}
+
+/**
+ * Compare a finished golden-frames job with the committed baselines in
+ * `tests/golden/`, writing diff images and the report next to the rendered
+ * frames (gitignored). With `update`, the rendered frames replace the
+ * baselines instead; review the change in Git before committing.
+ */
+export async function compareGolden(
+  workspace: WorkspaceService,
+  controller: RenderController,
+  productionId: string,
+  renderId: string,
+  options: { update?: boolean } = {},
+): Promise<GoldenReport> {
+  const { state } = await controller.get(renderId);
+  if (state.productionId !== productionId || state.kind !== "frames")
+    throw new MotionStudioError("NOT_FOUND", "No golden-frames job of this production has that ID");
   if (state.status !== "succeeded" || !state.outputs?.frames) {
     throw new MotionStudioError(
       "RENDER_FAILED",
       `Golden frames could not be rendered: ${state.error?.message ?? state.status}`,
     );
   }
-
-  const baselineDir = workspace.policy.resolve(dir, "tests", "golden");
-  const diffDir = workspace.policy.resolve(workspace.tmpRoot, "golden", state.renderId);
-  await mkdir(baselineDir, { recursive: true });
+  const config = await readGoldenConfig(workspace, productionId);
+  const { dir } = await workspace.locate("production", productionId);
+  const framesDir = workspace.policy.resolve(workspace.tmpRoot, "golden", renderId);
+  await mkdir(workspace.policy.resolve(dir, "tests", "golden"), { recursive: true });
   const results: GoldenFrameResult[] = [];
 
   for (const actualRelative of state.outputs.frames) {
-    const actual = path.join(workspace.repoRoot, ...actualRelative.split("/"));
-    const frame = Number(/frame-(\d+)\.png$/.exec(actual)![1]);
-    const baseline = path.join(baselineDir, `frame-${frame}.png`);
+    const frame = Number(FRAME_FILE.exec(path.posix.basename(actualRelative))![1]);
+    const actual = workspace.policy.resolve(framesDir, `frame-${frame}.png`);
+    const baseline = baselineFile(workspace, dir, frame);
     const baselineRelative = toRepoRelative(workspace.repoRoot, baseline);
     if (options.update) {
       await copyFile(actual, baseline);
@@ -202,20 +281,131 @@ export async function runGolden(
       actual: actualRelative,
       comparison,
     };
-    if (!comparison.pass && diff) {
-      await mkdir(diffDir, { recursive: true });
-      const diffFile = path.join(diffDir, `frame-${frame}-diff.png`);
+    // Diff images for every compared frame, so a pass can be inspected too.
+    if (diff) {
+      const diffFile = path.join(framesDir, `frame-${frame}-diff.png`);
       await writeFile(diffFile, PNG.sync.write(diff));
       result.diff = toRepoRelative(workspace.repoRoot, diffFile);
     }
     results.push(result);
   }
 
-  return {
-    ok: results.every((result) => result.status === "pass" || result.status === "updated"),
+  const report: GoldenReport = {
+    ok: reportOk(results),
     productionId,
-    renderId: state.renderId,
+    renderId,
+    profileId: state.profileId,
+    comparedAt: workspace.timestamp(),
     tolerance: config.tolerance,
     frames: results.sort((a, b) => a.frame - b.frame),
   };
+  await writeFileAtomic(path.join(framesDir, REPORT_FILE), serializeJson(report));
+  return report;
+}
+
+/**
+ * Render the configured frames and compare them with the committed
+ * baselines in one call (the CLI and the acceptance test). With `update`,
+ * the rendered frames replace the baselines instead.
+ */
+export async function runGolden(
+  workspace: WorkspaceService,
+  controller: RenderController,
+  productionId: string,
+  options: { update?: boolean } = {},
+): Promise<GoldenReport> {
+  const job = await startGolden(workspace, controller, productionId);
+  await controller.wait(job.renderId);
+  return compareGolden(workspace, controller, productionId, job.renderId, options);
+}
+
+/**
+ * Make the frames rendered in a compared job the new baselines for the given
+ * frames. Baselines are committed files, so this is a deliberate operator
+ * action; the change shows up in Git for review.
+ */
+export async function acceptGoldenFrames(
+  workspace: WorkspaceService,
+  productionId: string,
+  renderId: string,
+  frames: number[],
+): Promise<GoldenReport> {
+  const report = await readReport(workspace, renderId);
+  if (!report || report.productionId !== productionId)
+    throw new MotionStudioError("NOT_FOUND", "No golden report of this production has that ID");
+  if (frames.length === 0)
+    throw new MotionStudioError("INVALID_INPUT", "Choose at least one frame");
+  const { dir } = await workspace.locate("production", productionId);
+  const framesDir = workspace.policy.resolve(workspace.tmpRoot, "golden", renderId);
+  for (const frame of frames) {
+    const result = report.frames.find((entry) => entry.frame === frame);
+    if (!result) throw new MotionStudioError("NOT_FOUND", `Frame ${frame} is not in this report`);
+    const actual = workspace.policy.resolve(framesDir, `frame-${frame}.png`);
+    await copyFile(actual, baselineFile(workspace, dir, frame));
+    result.status = "updated";
+    delete result.comparison;
+    delete result.diff;
+  }
+  report.ok = reportOk(report.frames);
+  await writeFileAtomic(path.join(framesDir, REPORT_FILE), serializeJson(report));
+  return report;
+}
+
+/** Resolve one golden image for serving: a committed baseline, or a rendered frame or diff from a report. */
+export async function goldenImageFile(
+  workspace: WorkspaceService,
+  productionId: string,
+  kind: "baseline" | "actual" | "diff",
+  frame: number,
+  renderId?: string,
+): Promise<string> {
+  if (!Number.isInteger(frame) || frame < 0)
+    throw new MotionStudioError("NOT_FOUND", "No such frame");
+  const { dir } = await workspace.locate("production", productionId);
+  if (kind === "baseline") return baselineFile(workspace, dir, frame);
+  if (!renderId || !isRenderId(renderId)) throw new MotionStudioError("NOT_FOUND", "No such frame");
+  const report = await readReport(workspace, renderId);
+  if (report?.productionId !== productionId)
+    throw new MotionStudioError("NOT_FOUND", "No such frame");
+  return workspace.policy.resolve(
+    workspace.tmpRoot,
+    "golden",
+    renderId,
+    kind === "diff" ? `frame-${frame}-diff.png` : `frame-${frame}.png`,
+  );
+}
+
+function baselineFile(workspace: WorkspaceService, productionDir: string, frame: number): string {
+  return workspace.policy.resolve(productionDir, "tests", "golden", `frame-${frame}.png`);
+}
+
+function reportOk(frames: GoldenFrameResult[]): boolean {
+  return frames.every((frame) => frame.status === "pass" || frame.status === "updated");
+}
+
+async function readReport(
+  workspace: WorkspaceService,
+  renderId: string,
+): Promise<GoldenReport | undefined> {
+  if (!isRenderId(renderId)) return undefined;
+  try {
+    const file = workspace.policy.resolve(workspace.tmpRoot, "golden", renderId, REPORT_FILE);
+    return JSON.parse(await readFile(file, "utf8")) as GoldenReport;
+  } catch {
+    return undefined;
+  }
+}
+
+async function latestReport(
+  workspace: WorkspaceService,
+  productionId: string,
+): Promise<GoldenReport | undefined> {
+  const root = workspace.policy.resolve(workspace.tmpRoot, "golden");
+  // Render IDs start with a UTC timestamp, so a reverse sort is newest first.
+  const ids = (await readdir(root).catch(() => [])).filter(isRenderId).sort().reverse();
+  for (const id of ids) {
+    const report = await readReport(workspace, id);
+    if (report?.productionId === productionId) return report;
+  }
+  return undefined;
 }

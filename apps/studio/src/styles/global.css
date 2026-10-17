@@ -1011,3 +1011,67 @@ pre.diff span[data-op="remove"] {
 .advanced-props[open] summary {
   margin-bottom: var(--space-3);
 }
+
+/* ------------------------------------------------------------ golden */
+
+.golden-panel {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.golden-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-4);
+}
+
+.golden-frame {
+  display: grid;
+  gap: var(--space-2);
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-3);
+}
+
+.golden-frame h3,
+.golden-frame p {
+  margin: 0;
+}
+
+.golden-images {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-3);
+}
+
+.golden-images figure {
+  margin: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.golden-images img {
+  display: block;
+  width: 100%;
+  max-height: 480px;
+  object-fit: contain;
+  background: #0d0e10;
+  border-radius: var(--radius);
+}
+
+.golden-images figcaption {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.checkbox input {
+  width: auto;
+  flex: none;
+}
